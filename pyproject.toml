@@ -1,0 +1,40 @@
+[project]
+name = "commerce-console"
+version = "0.1.0"
+description = "A team MCP gateway for WooCommerce operations"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.143.1",
+  "uvicorn[standard]>=0.35,<1",
+  "mcp==2.3.0",
+  "httpx>=0.28,<1",
+  "sqlalchemy==2.1.4",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.16,<2",
+  "argon2-cffi>=25,<26",
+  "google-genai==2.31.0",
+  "kubernetes>=33,<36",
+  "pydantic-settings>=2.10,<3",
+  "oauthlib==4.0.0",
+  "jsonschema>=4.25,<5",
+]
+
+[dependency-groups]
+dev = [
+    "playwright>=1.56,<2",
+    "pytest>=8.4,<10",
+    "pytest-asyncio>=1,<2",
+    "ruff>=0.12,<1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
