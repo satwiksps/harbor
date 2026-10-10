@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+public/fonts/Switzer-Variable.woff2
+switzer.zip
+font-source/
+.qa/
