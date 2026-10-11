@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Daily steel bottle</title><desc id="desc">Original illustration of a matte forest green reusable steel bottle on a pale sage background.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#e7ece1"/><stop offset="1" stop-color="#d4dfd0"/></linearGradient>
+    <linearGradient id="steel"><stop stop-color="#204c42"/><stop offset=".24" stop-color="#4b7565"/><stop offset=".57" stop-color="#386553"/><stop offset="1" stop-color="#20483d"/></linearGradient>
+    <linearGradient id="cap"><stop stop-color="#17382f"/><stop offset=".35" stop-color="#325648"/><stop offset="1" stop-color="#19372f"/></linearGradient>
+    <linearGradient id="metal"><stop stop-color="#a3aca1"/><stop offset=".4" stop-color="#e8ece2"/><stop offset="1" stop-color="#81958a"/></linearGradient>
+    <filter id="shadow"><feGaussianBlur stdDeviation="13"/></filter>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h800v800H0z"/>
+  <circle cx="112" cy="132" r="270" fill="#f2f4eb" opacity=".5"/>
+  <ellipse cx="404" cy="684" rx="135" ry="23" fill="#60755d" opacity=".25" filter="url(#shadow)"/>
+  <path d="M337 202v45c0 24-41 33-48 66-4 17-5 53-5 84v221c0 41 26 57 116 57s116-16 116-57V397c0-31-1-67-5-84-7-33-48-42-48-66v-45z" fill="url(#steel)"/>
+  <path d="M298 358c-2 20-3 41-3 67v190c0 35 18 43 39 47" fill="none" stroke="#91ac91" stroke-opacity=".3" stroke-width="3"/>
+  <path d="M492 345c5 28 6 52 6 90v188" fill="none" stroke="#132e27" stroke-opacity=".3" stroke-width="3"/>
+  <ellipse cx="400" cy="213" rx="64" ry="9" fill="#b8c4b8"/>
+  <path d="M335 186h130v33c-14 13-116 13-130 0z" fill="url(#metal)"/>
+  <path d="M337 135c0-15 26-23 63-23s63 8 63 23v63c-18 13-108 13-126 0z" fill="url(#cap)"/>
+  <ellipse cx="400" cy="135" rx="63" ry="18" fill="#3e6051"/>
+  <ellipse cx="400" cy="131" rx="54" ry="12" fill="#456959"/>
+  <path d="M351 156v34m10-31v34m10-32v35m10-34v35m10-34v35m10-35v35m10-35v35m10-36v35m10-36v34m10-37v34m10-38v32" stroke="#162f28" stroke-width="1.6" opacity=".5"/>
+  <path d="M361 115v-9c0-23 17-36 39-36s39 13 39 36v9" fill="none" stroke="#2e5042" stroke-width="12"/>
+  <path d="M364 110v-4c0-21 15-31 36-31s36 10 36 31v4" fill="none" stroke="#63816a" stroke-width="2"/>
+  <g transform="translate(379 425)"><path d="M0 0h22a20 20 0 0 1 0 40H0m0-20h42" fill="none" stroke="#c7d3ba" stroke-width="3" stroke-linecap="round"/><text x="-2" y="72" font-family="Arial,sans-serif" font-size="11" letter-spacing="3" fill="#c7d3ba">DAILY</text><path d="M7 88h28" stroke="#91ad91" stroke-width="1"/></g>
+  <path d="M295 627c14 29 196 29 210 0" fill="none" stroke="#658772" stroke-opacity=".25" stroke-width="2"/>
+</svg>

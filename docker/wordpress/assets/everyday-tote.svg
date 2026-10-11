@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Everyday canvas tote</title><desc id="desc">Original illustration of a natural canvas tote with green handles on a warm stone background.</desc>
+  <defs>
+    <linearGradient id="bg" x2="0.8" y2="1"><stop stop-color="#eeeae0"/><stop offset="1" stop-color="#e0ddd2"/></linearGradient>
+    <linearGradient id="canvas" x2="1" y2="0.7"><stop stop-color="#eee4cb"/><stop offset="0.6" stop-color="#e0d2b5"/><stop offset="1" stop-color="#cabea0"/></linearGradient>
+    <linearGradient id="side" x2="1"><stop stop-color="#b4a98a"/><stop offset="1" stop-color="#c9bc9d"/></linearGradient>
+    <pattern id="weave" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M0 2h7M2 0v7" stroke="#8e8163" stroke-opacity=".06" stroke-width=".7"/></pattern>
+    <filter id="shadow"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h800v800H0z"/>
+  <circle cx="660" cy="125" r="232" fill="#f5f2e9" opacity=".55"/>
+  <ellipse cx="407" cy="660" rx="204" ry="24" fill="#8e8b79" opacity=".23" filter="url(#shadow)"/>
+  <path d="M273 323v-99c0-92 46-132 102-132s102 40 102 132v100" fill="none" stroke="#3b6558" stroke-width="29"/>
+  <path d="M278 323v-99c0-87 43-126 97-126s97 39 97 126v100" fill="none" stroke="#7a9383" stroke-width="2"/>
+  <path d="m576 296 33 315-42 37-39-348z" fill="url(#side)"/>
+  <path d="m218 286 354 10 29 315c-2 26-22 40-49 42l-304-9c-25-2-42-18-42-41z" fill="url(#canvas)"/>
+  <path d="m218 286 354 10 29 315c-2 26-22 40-49 42l-304-9c-25-2-42-18-42-41z" fill="url(#weave)"/>
+  <path d="m226 305 338 10M225 326l329 9" fill="none" stroke="#ad9d7b" stroke-width="1.5" stroke-dasharray="3 4" opacity=".6"/>
+  <path d="m225 335-8 267c0 21 13 31 32 33l300 8" fill="none" stroke="#b8aa8a" stroke-width="2" opacity=".7"/>
+  <path d="M303 316V225c0-74 34-113 84-113s85 39 85 113v97" fill="none" stroke="#416c5d" stroke-width="29"/>
+  <path d="M295 316V225c0-78 38-122 92-122s93 44 93 122v97" fill="none" stroke="#819a88" stroke-width="1.5"/>
+  <path d="M311 315V225c0-69 30-105 76-105s77 36 77 105v97" fill="none" stroke="#213f34" stroke-width="1.5" opacity=".6"/>
+  <path d="m288 313 28 1v52l-28-1zm169 4 29 1v51l-29-1z" fill="#416c5d"/>
+  <path d="m292 322 20 1v33l-20-1zm169 5 21 1v31l-21-1z" fill="none" stroke="#a8b79c" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <g transform="translate(347 449) rotate(2)"><path d="M0 0h22a20 20 0 0 1 0 40H0m0-20h42" fill="none" stroke="#496c56" stroke-width="3.5" stroke-linecap="round"/><text x="-17" y="69" font-family="Arial,sans-serif" font-size="11" letter-spacing="3.5" fill="#496c56">EVERYDAY</text></g>
+  <path d="m554 609 2-239" stroke="#aa9e7d" stroke-width="1.5" opacity=".25"/>
+</svg>

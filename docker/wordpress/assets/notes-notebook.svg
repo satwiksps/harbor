@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Notes for tomorrow notebook</title><desc id="desc">Original illustration of a clay colored hardcover notebook with cream pages, a green elastic band, and the title Notes for tomorrow.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#f0e8de"/><stop offset="1" stop-color="#e6d8ca"/></linearGradient>
+    <linearGradient id="cover" x2="1" y2=".7"><stop stop-color="#b87858"/><stop offset=".6" stop-color="#b27657"/><stop offset="1" stop-color="#9c6045"/></linearGradient>
+    <linearGradient id="pages" x2="1"><stop stop-color="#d3c5a7"/><stop offset=".16" stop-color="#f3e8d0"/><stop offset="1" stop-color="#e3d5b9"/></linearGradient>
+    <pattern id="grain" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 1h6M1 0v6" stroke="#5b3421" stroke-opacity=".05" stroke-width=".7"/></pattern>
+    <filter id="shadow"><feGaussianBlur stdDeviation="13"/></filter>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h800v800H0z"/>
+  <circle cx="720" cy="150" r="300" fill="#f6eee3" opacity=".5"/>
+  <ellipse cx="405" cy="680" rx="194" ry="24" fill="#8d705a" opacity=".25" filter="url(#shadow)"/>
+  <g transform="rotate(-9 400 400)">
+    <path d="M236 155h307a13 13 0 0 1 13 13v478a15 15 0 0 1-15 15H236a18 18 0 0 1-18-18V173a18 18 0 0 1 18-18z" fill="#89573d"/>
+    <path d="M239 170h301v470H239z" fill="url(#pages)"/>
+    <path d="M248 630h290m-290-5h290m-290-5h290m-290-5h290m-290-5h290m-290-5h290" stroke="#c4b694" stroke-width="1" opacity=".7"/>
+    <path d="M235 143h307a14 14 0 0 1 14 14v458c0 6-5 11-11 11H235a17 17 0 0 1-17-17V160a17 17 0 0 1 17-17z" fill="url(#cover)"/>
+    <path d="M235 143h307a14 14 0 0 1 14 14v458c0 6-5 11-11 11H235a17 17 0 0 1-17-17V160a17 17 0 0 1 17-17z" fill="url(#grain)"/>
+    <path d="M244 147v475" stroke="#865239" stroke-width="2" opacity=".5"/>
+    <path d="M233 150v463c0 4 4 7 9 7h299" fill="none" stroke="#d69c76" stroke-width="1.5" opacity=".6"/>
+    <path d="M499 143h19v482h-19z" fill="#47664f"/>
+    <path d="M503 144v478m11-478v478" stroke="#6a8568" stroke-width="1" opacity=".7"/>
+    <g fill="#f2dcc2" font-family="Arial,sans-serif"><text x="280" y="286" font-size="37" letter-spacing="4">NOTES</text><text x="282" y="316" font-size="13" letter-spacing="1.8">for tomorrow</text><path d="M283 343h36" fill="none" stroke="#f2dcc2" stroke-width="1"/></g>
+    <path d="M286 523h16a14 14 0 0 1 0 28h-16m0-14h30" fill="none" stroke="#eed3b7" stroke-width="2" stroke-linecap="round"/>
+    <path d="M386 642v60l10-8 10 8v-60" fill="#42644d"/>
+  </g>
+</svg>
