@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: commerce
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.consoleHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: {service: {name: gateway, port: {number: 8000}}}
+          - path: /mcp
+            pathType: Prefix
+            backend: {service: {name: gateway, port: {number: 8000}}}
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: dashboard, port: {number: 8080}}}
+    - host: {{ .Values.ingress.storeHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: wordpress, port: {number: 80}}}

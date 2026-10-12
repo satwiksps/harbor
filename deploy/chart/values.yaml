@@ -1,0 +1,68 @@
+nameOverride: commerce
+images:
+  app: commerce-console:dev
+  dashboard: commerce-dashboard:dev
+  wordpress: commerce-wordpress:dev
+  mariadb: mariadb:11.4.13
+  postgres: postgres:17.11
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+rolloutRevision: initial
+ingress:
+  className: traefik
+  consoleHost: console.localhost
+  storeHost: store.localhost
+  annotations: {}
+  tls: []
+urls:
+  console: http://console.localhost:8080
+  store: http://store.localhost:8080
+secrets:
+  application: commerce-app-secrets
+  upstreamCredentials: commerce-upstream-credentials
+storage:
+  className: local-path
+  wordpress: 2Gi
+  mariadb: 2Gi
+  postgres: 1Gi
+  retain: true
+gateway:
+  replicas: 1
+  geminiModel: gemini-3.1-flash-lite
+  adminEmail: admin@urumi.local
+  adminName: Satwik
+  secureCookies: false
+  resources:
+    requests: {cpu: 150m, memory: 192Mi}
+    limits: {cpu: "1", memory: 512Mi}
+dashboard:
+  resources:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 250m, memory: 128Mi}
+wordpress:
+  adminUser: storeadmin
+  adminEmail: storeadmin@urumi.local
+  title: Urumi Supply
+  resources:
+    requests: {cpu: 200m, memory: 256Mi}
+    limits: {cpu: "1", memory: 768Mi}
+mariadb:
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {cpu: 750m, memory: 512Mi}
+postgres:
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 384Mi}
+upstreams:
+  resources:
+    requests: {cpu: 50m, memory: 96Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+networkPolicy:
+  enabled: true
+  ingressNamespace: kube-system
+  ingressPodLabel:
+    app.kubernetes.io/name: traefik
+  apiServerCidr: 10.43.0.1/32
+  # k3s API endpoint after service DNAT. Set from kubectl get nodes -o wide.
+  apiServerNodeCidr: 127.0.0.1/32

@@ -1,0 +1,27 @@
+# Build and push versioned images, then replace these names with your registry.
+images:
+  app: ghcr.io/REPLACE_OWNER/commerce-console:0.1.0
+  dashboard: ghcr.io/REPLACE_OWNER/commerce-dashboard:0.1.0
+  wordpress: ghcr.io/REPLACE_OWNER/commerce-wordpress:0.1.0
+imagePullPolicy: IfNotPresent
+ingress:
+  className: traefik
+  consoleHost: console.example.com
+  storeHost: store.example.com
+  # Create a TLS secret out of band or configure cert-manager separately.
+  tls:
+    - secretName: commerce-ingress-tls
+      hosts: [console.example.com, store.example.com]
+urls:
+  console: https://console.example.com
+  store: https://store.example.com
+gateway:
+  secureCookies: true
+storage:
+  className: local-path
+  wordpress: 10Gi
+  mariadb: 10Gi
+  postgres: 5Gi
+networkPolicy:
+  # Replace with the internal IP of the k3s control-plane node.
+  apiServerNodeCidr: 10.0.0.10/32

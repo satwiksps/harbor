@@ -1,0 +1,52 @@
+{{- range $kind := list "woo" "policies" "shipping" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $kind }}-mcp
+  labels:
+    {{- include "commerce.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: {{ $kind }}-mcp}
+  template:
+    metadata:
+      labels: {app: {{ $kind }}-mcp, component: upstream, app.kubernetes.io/part-of: commerce-console}
+      annotations: {commerce.urumi.dev/revision: {{ $.Values.rolloutRevision | quote }}}
+    spec:
+      {{- include "commerce.pullSecrets" $ | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: mcp
+          image: {{ $.Values.images.app }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          command: [/app/.venv/bin/python, -m, upstreams.server]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          ports: [{containerPort: 8001, name: http}]
+          env:
+            - {name: UPSTREAM_KIND, value: {{ $kind }}}
+            - name: UPSTREAM_TOKEN
+              valueFrom: {secretKeyRef: {name: {{ $.Values.secrets.application }}, key: upstream_{{ $kind }}}}
+            {{- if eq $kind "woo" }}
+            - {name: WOO_URL, value: "http://wordpress:80"}
+            - {name: WOO_PUBLIC_URL, value: {{ $.Values.urls.store | quote }}}
+            - name: WOO_KEY
+              valueFrom: {secretKeyRef: {name: {{ $.Values.secrets.application }}, key: woo_key}}
+            - name: WOO_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $.Values.secrets.application }}, key: woo_secret}}
+            {{- end }}
+          startupProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 3, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /health/ready, port: http}, timeoutSeconds: 3, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml $.Values.upstreams.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ $kind }}-mcp}
+spec:
+  type: ClusterIP
+  selector: {app: {{ $kind }}-mcp}
+  ports: [{port: 8001, targetPort: http}]
+{{- end }}

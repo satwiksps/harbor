@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  labels:
+    {{- include "commerce.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: wordpress}
+  template:
+    metadata:
+      labels: {app: wordpress, app.kubernetes.io/part-of: commerce-console}
+      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 33, runAsGroup: 33, fsGroup: 33, seccompProfile: {type: RuntimeDefault}}
+      initContainers:
+        - name: sync-packaged-wordpress
+          image: {{ .Values.images.wordpress }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: [sh, -ec, "cp -r /usr/src/wordpress/. /var/www/html/"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: wordpress, mountPath: /var/www/html}]
+          resources: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
+      containers:
+        - name: wordpress
+          image: {{ .Values.images.wordpress }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          ports: [{containerPort: 8080, name: http}]
+          env:
+            - {name: WORDPRESS_DB_HOST, value: "mariadb:3306"}
+            - {name: WORDPRESS_DB_NAME, value: wordpress}
+            - {name: WORDPRESS_DB_USER, value: wordpress}
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: mariadb_password}}
+            - {name: STORE_PUBLIC_URL, value: {{ .Values.urls.store | quote }}}
+            - name: WORDPRESS_CONFIG_EXTRA
+              value: |
+                define('WP_HOME', getenv('STORE_PUBLIC_URL'));
+                define('WP_SITEURL', getenv('STORE_PUBLIC_URL'));
+                define('DISALLOW_FILE_EDIT', true);
+                define('AUTOMATIC_UPDATER_DISABLED', true);
+                if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $_SERVER['HTTPS'] = 'on'; }
+          volumeMounts: [{name: wordpress, mountPath: /var/www/html}]
+          startupProbe: {httpGet: {path: /health.php, port: http}, timeoutSeconds: 5, periodSeconds: 3, failureThreshold: 90}
+          readinessProbe: {httpGet: {path: "/health.php?ready=1", port: http}, timeoutSeconds: 5, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health.php, port: http}, timeoutSeconds: 5, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml .Values.wordpress.resources | nindent 12 }}
+      volumes: [{name: wordpress, persistentVolumeClaim: {claimName: wordpress-data}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: wordpress}
+spec:
+  type: ClusterIP
+  selector: {app: wordpress}
+  ports: [{port: 80, targetPort: http}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wordpress-bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels: {app: wordpress-bootstrap, app.kubernetes.io/part-of: commerce-console}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 33, runAsGroup: 33, fsGroup: 33, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: bootstrap
+          image: {{ .Values.images.wordpress }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: [sh, /opt/commerce/bootstrap.sh]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          env:
+            - {name: WORDPRESS_DB_HOST, value: "mariadb:3306"}
+            - {name: WORDPRESS_DB_NAME, value: wordpress}
+            - {name: WORDPRESS_DB_USER, value: wordpress}
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: mariadb_password}}
+            - {name: STORE_PUBLIC_URL, value: {{ .Values.urls.store | quote }}}
+            - {name: WP_ADMIN_USER, value: {{ .Values.wordpress.adminUser | quote }}}
+            - {name: WP_ADMIN_EMAIL, value: {{ .Values.wordpress.adminEmail | quote }}}
+            - {name: WP_TITLE, value: {{ .Values.wordpress.title | quote }}}
+            - name: WP_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: wordpress_admin_password}}
+            - name: WOO_KEY
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: woo_key}}
+            - name: WOO_SECRET
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: woo_secret}}
+            - name: WORDPRESS_CONFIG_EXTRA
+              value: |
+                define('WP_HOME', getenv('STORE_PUBLIC_URL'));
+                define('WP_SITEURL', getenv('STORE_PUBLIC_URL'));
+                define('DISALLOW_FILE_EDIT', true);
+                define('AUTOMATIC_UPDATER_DISABLED', true);
+          volumeMounts: [{name: wordpress, mountPath: /var/www/html}]
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+      volumes: [{name: wordpress, persistentVolumeClaim: {claimName: wordpress-data}}]

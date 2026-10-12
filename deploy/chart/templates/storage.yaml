@@ -1,0 +1,19 @@
+{{- range $name := list "wordpress" "mariadb" "postgres" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-data
+  labels:
+    {{- include "commerce.labels" $ | nindent 4 }}
+  {{- if $.Values.storage.retain }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ $.Values.storage.className | quote }}
+  resources:
+    requests:
+      storage: {{ index $.Values.storage $name }}
+{{- end }}

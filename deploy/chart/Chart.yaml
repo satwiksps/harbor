@@ -1,0 +1,6 @@
+apiVersion: v2
+name: commerce-console
+description: A team MCP gateway and a persistent WooCommerce store
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

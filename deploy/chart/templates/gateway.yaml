@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    {{- include "commerce.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels: {app: gateway}
+  template:
+    metadata:
+      labels: {app: gateway, app.kubernetes.io/part-of: commerce-console}
+      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      serviceAccountName: commerce-gateway
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: gateway
+          image: {{ .Values.images.app }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: [/app/.venv/bin/uvicorn, backend.app:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          ports: [{containerPort: 8000, name: http}]
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: database_url}}
+            - name: SESSION_SECRET
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: session_secret}}
+            - name: BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: admin_password}}
+            - name: GEMINI_API_KEY
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: gemini_api_key, optional: true}}
+            - {name: BOOTSTRAP_ADMIN_EMAIL, value: {{ .Values.gateway.adminEmail | quote }}}
+            - {name: BOOTSTRAP_ADMIN_NAME, value: {{ .Values.gateway.adminName | quote }}}
+            - {name: GEMINI_MODEL, value: {{ .Values.gateway.geminiModel | quote }}}
+            - {name: SECURE_COOKIES, value: {{ .Values.gateway.secureCookies | quote }}}
+            - {name: STORE_URL, value: {{ .Values.urls.store | quote }}}
+            - {name: GATEWAY_URL, value: {{ printf "%s/mcp" .Values.urls.console | quote }}}
+            - {name: INTERNAL_GATEWAY_URL, value: "http://127.0.0.1:8000/mcp"}
+            - {name: ALLOWED_ORIGINS, value: {{ .Values.urls.console | quote }}}
+            - {name: SECRET_BACKEND, value: kubernetes}
+            - {name: UPSTREAM_CREDENTIAL_SECRET, value: {{ .Values.secrets.upstreamCredentials | quote }}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - name: ALLOWED_INTERNAL_HOSTS
+              value: {{ printf "woo-mcp,policies-mcp,shipping-mcp,woo-mcp.%s.svc.cluster.local,policies-mcp.%s.svc.cluster.local,shipping-mcp.%s.svc.cluster.local" .Release.Namespace .Release.Namespace .Release.Namespace | quote }}
+            - name: BOOTSTRAP_SERVERS_JSON
+              value: '[{"name":"WooCommerce","slug":"woo","url":"http://woo-mcp:8001/mcp","credential_key":"woo","read_tools":["list_products","list_orders","get_order"]},{"name":"Store policies","slug":"policies","url":"http://policies-mcp:8001/mcp","credential_key":"policies","read_tools":["get_policy","search"]},{"name":"Shipping","slug":"shipping","url":"http://shipping-mcp:8001/mcp","credential_key":"shipping","read_tools":["quote_shipping","search"]}]'
+          startupProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 3, failureThreshold: 90}
+          readinessProbe: {httpGet: {path: /health/ready, port: http}, timeoutSeconds: 3, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml .Values.gateway.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: gateway}
+spec:
+  type: ClusterIP
+  selector: {app: gateway}
+  ports: [{port: 8000, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  labels:
+    {{- include "commerce.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dashboard}
+  template:
+    metadata:
+      labels: {app: dashboard, app.kubernetes.io/part-of: commerce-console}
+      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: dashboard
+          image: {{ .Values.images.dashboard }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          ports: [{containerPort: 8080, name: http}]
+          startupProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /health/ready, port: http}, timeoutSeconds: 3, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health/live, port: http}, timeoutSeconds: 3, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml .Values.dashboard.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: dashboard}
+spec:
+  type: ClusterIP
+  selector: {app: dashboard}
+  ports: [{port: 8080, targetPort: http}]

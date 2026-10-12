@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    {{- include "commerce.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres, app.kubernetes.io/part-of: commerce-console}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: {runAsUser: 999, runAsGroup: 999, fsGroup: 999, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: postgres
+          image: {{ .Values.images.postgres }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          ports: [{containerPort: 5432, name: postgres}]
+          env:
+            - {name: POSTGRES_USER, value: commerce}
+            - {name: POSTGRES_DB, value: commerce}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: postgres_password}}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+          startupProbe: {exec: {command: [sh, -c, "pg_isready -U commerce -d commerce"]}, timeoutSeconds: 5, periodSeconds: 5, failureThreshold: 60}
+          readinessProbe: {exec: {command: [sh, -c, "pg_isready -U commerce -d commerce"]}, timeoutSeconds: 5, periodSeconds: 5}
+          livenessProbe: {exec: {command: [sh, -c, "pg_isready -U commerce -d commerce"]}, timeoutSeconds: 5, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml .Values.postgres.resources | nindent 12 }}
+      volumes: [{name: data, persistentVolumeClaim: {claimName: postgres-data}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgres}
+spec:
+  type: ClusterIP
+  selector: {app: postgres}
+  ports: [{port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  labels:
+    {{- include "commerce.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: mariadb}
+  template:
+    metadata:
+      labels: {app: mariadb, app.kubernetes.io/part-of: commerce-console}
+    spec:
+      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: {runAsUser: 999, runAsGroup: 999, fsGroup: 999, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: mariadb
+          image: {{ .Values.images.mariadb }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          args: [--innodb-buffer-pool-size=96M, --max-connections=40]
+          ports: [{containerPort: 3306, name: mysql}]
+          env:
+            - {name: MARIADB_DATABASE, value: wordpress}
+            - {name: MARIADB_USER, value: wordpress}
+            - name: MARIADB_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: mariadb_password}}
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: mariadb_root_password}}
+          volumeMounts: [{name: data, mountPath: /var/lib/mysql}]
+          startupProbe: {exec: {command: [healthcheck.sh, --connect, --innodb_initialized]}, timeoutSeconds: 5, periodSeconds: 5, failureThreshold: 90}
+          readinessProbe: {exec: {command: [healthcheck.sh, --connect, --innodb_initialized]}, timeoutSeconds: 5, periodSeconds: 5}
+          livenessProbe: {exec: {command: [healthcheck.sh, --connect]}, timeoutSeconds: 5, periodSeconds: 10, failureThreshold: 6}
+          resources: {{- toYaml .Values.mariadb.resources | nindent 12 }}
+      volumes: [{name: data, persistentVolumeClaim: {claimName: mariadb-data}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mariadb}
+spec:
+  type: ClusterIP
+  selector: {app: mariadb}
+  ports: [{port: 3306, targetPort: mysql}]
