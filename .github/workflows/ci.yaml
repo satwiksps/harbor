@@ -1,0 +1,52 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.23
+      - run: uv sync --frozen
+      - run: uv run ruff check backend upstreams tests scripts examples
+      - run: uv run pytest -q
+      - name: Offline credential preparation checks
+        run: uv run python scripts/test-secret-preparation.py
+      - name: Offline local recovery guards
+        shell: pwsh
+        run: ./scripts/test-local-recovery.ps1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: dashboard
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned Helm and verify checksum
+        run: |
+          curl -fsSLO https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz
+          curl -fsSLO https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz.sha256sum
+          sha256sum -c helm-v4.3.1-linux-amd64.tar.gz.sha256sum
+          tar -xzf helm-v4.3.1-linux-amd64.tar.gz
+      - run: ./linux-amd64/helm lint deploy/chart -f deploy/values-local.yaml
+      - run: ./linux-amd64/helm lint deploy/chart -f deploy/values-prod.yaml
+      - run: ./linux-amd64/helm template commerce deploy/chart -f deploy/values-prod.yaml > /tmp/commerce-rendered.yaml
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t commerce-console:ci .
+      - run: docker build -t commerce-dashboard:ci -f dashboard/Dockerfile .
+      - run: docker build -t commerce-wordpress:ci docker/wordpress
