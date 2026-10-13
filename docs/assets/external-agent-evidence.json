@@ -1,0 +1,34 @@
+{
+  "verified_at": "2026-10-15T18:07:52.13091+05:30",
+  "model": "gemini-3.1-flash-lite",
+  "checks": [
+    {
+      "name": "Inspector discovers three upstreams with member key",
+      "passed": true
+    },
+    {
+      "name": "Inspector calls today's orders successfully",
+      "passed": true
+    },
+    {
+      "name": "Independent real Gemini agent calls two upstreams as user B",
+      "passed": true
+    },
+    {
+      "passed": true,
+      "name": "All three upstreams audited as the same member"
+    },
+    {
+      "passed": true,
+      "name": "Temporary external client key revoked"
+    }
+  ],
+  "tool_aliases": [
+    "woo__list_orders_c12816d2",
+    "policies__get_policy_049c5664",
+    "woo__get_order_45915cb9",
+    "shipping__quote_shipping_71a1cdc7"
+  ],
+  "verified_order_id": 25,
+  "answer": "Today's WooCommerce orders are as follows:\n\n*   **Order 25:** Total 308.00 INR\n*   **Order 22:** Total 308.00 INR\n*   **Order 18:** Total 308.00 INR\n\nAccording to the shipping policy (version 2026-10-15), the free-shipping threshold is 1500.00 INR. None of the orders placed today meet this threshold, so all are subject to shipping charges.\n\n### Shipping Quote for Order 25\nUsing the subtotal of 249.00 INR and the destination of Karnataka (KA), India, the estimated shipping cost is **59.00 INR**. This quote is based on rate-table version 2026-10-15."
+}
