@@ -1,8 +1,19 @@
-# Harbor
+<p align="center">
+  <img src=".github/assets/harbor-banner.svg" alt="Harbor: a team MCP gateway" width="1280">
+</p>
+
+<p align="center">
+  <strong>One gateway for your team's commerce tools.</strong>
+</p>
+
+<p align="center">
+  <a href="https://useharbor.pages.dev/">Documentation</a> &nbsp;·&nbsp;
+  <a href="https://useharbor.pages.dev/getting-started/">Installation</a> &nbsp;·&nbsp;
+  <a href="https://useharbor.pages.dev/system-design/">Architecture</a> &nbsp;·&nbsp;
+  <a href="https://useharbor.pages.dev/verification/">Verification</a>
+</p>
 
 A team MCP gateway for WooCommerce, with a React dashboard, personal API keys, role-based tool access, and Gemini chat with explicit write confirmation.
-
-**[Documentation](https://useharbor.pages.dev/)** · [Installation](https://useharbor.pages.dev/getting-started/) · [Architecture](https://useharbor.pages.dev/system-design/) · [Verification](https://useharbor.pages.dev/verification/)
 
 ## Stack
 

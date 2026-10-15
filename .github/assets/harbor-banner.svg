@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title description">
+  <title id="title">Harbor</title>
+  <desc id="description">Harbor, a team MCP gateway. One connection branches through the Harbor mark to three tools.</desc>
+  <rect width="1280" height="360" rx="16" fill="#f3f2ed"/>
+  <rect x="0.5" y="0.5" width="1279" height="359" rx="15.5" fill="none" stroke="#d6d3c8"/>
+
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="70" y="85" fill="#545d56" font-size="14" font-weight="600" letter-spacing="2.8">TEAM MCP GATEWAY</text>
+    <text x="64" y="214" fill="#136b69" font-size="120" font-weight="600" letter-spacing="-5">Harbor</text>
+    <path d="M70 268h44" stroke="#136b69" stroke-width="3"/>
+    <text x="132" y="274" fill="#545d56" font-size="18" letter-spacing="0.3">Tools. Identity. Control.</text>
+  </g>
+
+  <g fill="none" stroke="#a7bdb3" stroke-width="2">
+    <path d="M653 180h107"/>
+    <path d="M840 180h77q18 0 18-18v-62q0-18 18-18h53"/>
+    <path d="M840 180h166"/>
+    <path d="M840 180h77q18 0 18 18v62q0 18 18 18h53"/>
+  </g>
+  <circle cx="641" cy="180" r="12" fill="#f3f2ed" stroke="#136b69" stroke-width="2"/>
+  <circle cx="641" cy="180" r="4" fill="#136b69"/>
+
+  <rect x="760" y="140" width="80" height="80" rx="24" fill="#136b69"/>
+  <path d="M786 164v32m28-32v32M786 180h28" fill="none" stroke="#f3f2ed" stroke-width="6" stroke-linecap="round"/>
+
+  <g fill="#fcfcf9" stroke="#d6d3c8">
+    <rect x="1006" y="50" width="204" height="64" rx="10"/>
+    <rect x="1006" y="148" width="204" height="64" rx="10"/>
+    <rect x="1006" y="246" width="204" height="64" rx="10"/>
+  </g>
+  <g fill="#136b69">
+    <circle cx="1030" cy="82" r="4"/>
+    <circle cx="1030" cy="180" r="4"/>
+    <circle cx="1030" cy="278" r="4"/>
+  </g>
+  <g fill="#344c45" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" font-weight="500">
+    <text x="1048" y="89">Commerce</text>
+    <text x="1048" y="187">Policies</text>
+    <text x="1048" y="285">Shipping</text>
+  </g>
+</svg>
