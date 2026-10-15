@@ -1,6 +1,6 @@
 # Verification record
 
-Validation is performed against the local `k3d-urumi-commerce` cluster, not a public VPS. Run the commands below to reproduce the checks. Live acceptance tests create synthetic store data and consume Gemini quota.
+Validation is performed against the local k3d cluster, not a public VPS. Run the commands below to reproduce the checks. Live acceptance tests create synthetic store data and consume Gemini quota.
 
 ## Independent audit corrections, 15 October 2026
 
@@ -26,7 +26,7 @@ The schema worker has a Linux-only 128 MiB address-space limit; Windows tests de
 
 For the isolated accessibility harness, set `COMMERCE_CONSOLE_URL` to the running console or frontend preview, then run `uv run python -m tests.browser_accessibility`. All API responses are browser-local fixtures; it sends no provider calls or application mutations. `tests.browser_acceptance --audit-only` now writes `audit-report.json` with scope `activity-only`; it never changes the full-journey `report.json`.
 
-No live Gemini request, new checkout submission, backup restoration, public TLS/VPS test, or pod-failure drill was repeated during this correction pass. Earlier evidence for those flows remains explicitly separate below. Runtime screenshots and reports remain Git-excluded.
+No live Gemini request, new checkout, backup restoration, public TLS/VPS test, or pod-failure drill was repeated during this correction pass. Earlier evidence for those flows remains explicitly separate below. Runtime screenshots and reports remain Git-excluded.
 
 ## Earlier end-to-end verification
 

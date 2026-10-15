@@ -1,6 +1,6 @@
 # System design and tradeoffs
 
-Commerce Console is a single-team WooCommerce operations workspace. It demonstrates a complete MCP gateway on Kubernetes with independently failing upstreams. It is an internship submission, not an official Urumi product.
+Commerce Console is a single-team WooCommerce operations workspace. It demonstrates a complete MCP gateway on Kubernetes with independently failing upstreams.
 
 ## Components
 
@@ -86,7 +86,7 @@ Prices remain decimal strings and Python Decimal values. The sample store uses I
 
 Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production deployment uses images pushed to a registry accessible to the target k3s machine. The public VPS deployment is not implied by local verification.
 
-One replica per component is intentional. PostgreSQL and MariaDB are not HA, local-path volumes are node-local, in-process rate limits are not distributed, and the gateway is not horizontally scaled. These are documented limits of a small single-node deployment. Redis, queues, a service mesh and a custom operator would not improve the required demonstration enough to justify their operational cost.
+One replica per component is intentional. PostgreSQL and MariaDB are not HA, local-path volumes are node-local, in-process rate limits are not distributed, and the gateway is not horizontally scaled. These are documented limits of a small single-node deployment. Redis, queues, a service mesh and a custom operator would add operational cost beyond the needs of this scope.
 
 Upgrades use versioned images and Helm. Application rollback is distinct from database rollback. Back up the databases and WordPress content before an incompatible migration. Do not assume `helm rollback` restores persistent data.
 
@@ -96,4 +96,3 @@ Upgrades use versioned images and Helm. Application rollback is distinct from da
 - [WooCommerce REST API](https://developer.woocommerce.com/docs/apis/rest-api/)
 - [K3s networking and policy enforcement](https://docs.k3s.io/networking/networking-services)
 - [K3s Secret encryption](https://docs.k3s.io/security/secrets-encryption)
-- [Urumi public engineering practices](https://github.com/UrumiAI/otta.sh/blob/main/DEVELOPMENT.md)

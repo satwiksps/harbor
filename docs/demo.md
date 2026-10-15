@@ -1,6 +1,6 @@
-# Demo walkthrough
+# Technical walkthrough
 
-Aim for a focused 10 to 12 minute recording. Use the real Kubernetes deployment, two browser profiles, a member MCP client, and a terminal. Do a rehearsal first. Narrate decisions in your own words; the interview will cover the implementation.
+This 10 to 12 minute walkthrough covers the running system and its security boundaries. Use the real Kubernetes deployment, two browser profiles, a member MCP client, and a terminal. Rehearse first and explain the decisions alongside the observed behavior.
 
 ## Prepare
 
@@ -9,6 +9,7 @@ Aim for a focused 10 to 12 minute recording. Use the real Kubernetes deployment,
 - Configure the MCP client using the member's URL and key. Test that all seven read tools appear, including the two distinct `search` tools.
 - Choose a unique product name and SKU for this recording. Have a fictional Indian checkout address ready. Set browser zoom to 100 percent.
 - Open Connections, Activity, storefront, WordPress Orders, and a terminal with namespace `commerce`. Keep passwords, Secrets and unredacted client configuration closed.
+- Before running cluster commands, inspect the current context with `kubectl config get-contexts` and `kubectl config current-context`. Select the context created by bootstrap with `kubectl config use-context CONTEXT_NAME`, replacing `CONTEXT_NAME` with that actual context. See [context selection](operations.md#select-the-local-context) for the local procedure.
 
 ## Show, then explain
 
@@ -17,14 +18,14 @@ Aim for a focused 10 to 12 minute recording. Use the real Kubernetes deployment,
 3. **Member and two upstreams, two minutes.** Switch to the member's external client. Show the tool names and that create/update tools are absent. Ask today's orders. Run the shipping-policy-plus-quote prompt from the [user guide](user-guide.md#connect-an-external-client). Show both upstream tool results. Explain that the external client has only a gateway URL and one personal key.
 4. **Control and isolation, two minutes.** Disable Shipping in Connections, refresh external discovery and show its tools disappear. Read the returns policy successfully. Re-enable Shipping. Revoke the member's key and show that the next request is rejected. Show Activity with both users and success/denied outcomes.
 5. **Failure and Kubernetes, two minutes.** Hold one upstream down with `kubectl -n commerce scale deployment/policies-mcp --replicas=0`, then wait for the dashboard to show Unreachable. Call a commerce or shipping tool successfully. Restore with `--replicas=1`. Scaling to zero holds the failure long enough to observe it; Kubernetes normally replaces a killed pod quickly. Also show a pod deletion and its replacement. Show pods, PVCs, Ingress and the RBAC/NetworkPolicy manifests, without displaying Secret data.
-6. **Production and tradeoffs, one minute.** Compare local and production values. Explain DNS, TLS, images, storage and cluster Secret encryption. Describe backup before upgrade and why Helm rollback does not restore database contents. State which bonuses are complete and what is deliberately omitted.
+6. **Production and tradeoffs, one minute.** Compare local and production values. Explain DNS, TLS, images, storage and cluster Secret encryption. Describe backup before upgrade and why Helm rollback does not restore database contents. State which capabilities are demonstrated and which limitations remain.
 
 Useful terminal commands:
 
 ```powershell
-kubectl --context k3d-urumi-commerce -n commerce get pods,svc,ingress,pvc
-kubectl --context k3d-urumi-commerce -n commerce get networkpolicy
-kubectl --context k3d-urumi-commerce -n commerce get role,rolebinding
+kubectl -n commerce get pods,svc,ingress,pvc
+kubectl -n commerce get networkpolicy
+kubectl -n commerce get role,rolebinding
 .tools/helm.exe history commerce -n commerce
 ```
 
@@ -41,13 +42,11 @@ Do not run `kubectl get secret -o yaml` during a recording. Do not show `.secret
 - Shared store credentials still grant powerful authority to an authorized member. Read access includes commercial information, so order output excludes customer contact details.
 - A write timeout can be ambiguous. Do not retry a product creation automatically; check store state first. Use a unique SKU when possible.
 
-## Submission checklist
+## Walkthrough checklist
 
-- Repository accessible to reviewers, with no private credentials or generated runtime artifacts.
-- Video link accessible to anyone with the link, reviewed for accidental secrets.
-- Both users and every required flow visibly demonstrated.
-- Multi-store bonus: No. Stand-out items: tool permissions and security hardening. Claim additional items only if demonstrated and explained.
+- Source access arranged separately where needed, with no private credentials or generated runtime artifacts shared.
+- Any recording reviewed for accidental secrets before sharing.
+- Both users, write confirmation, checkout, multiple upstreams and revocation visibly demonstrated.
+- Scope described accurately: one store, one gateway replica, tool permissions and security controls. Claim additional capabilities only if demonstrated and explained.
 - LLM: Google Gemini, model configured in Helm values. The current local default is `gemini-3.1-flash-lite`.
-- Leave the live deployment URL empty unless you actually deploy and verify a public server.
-
-The submission form is linked in the original assignment. Do not submit a placeholder repository or video URL.
+- Present a public deployment URL only after deploying and verifying that server.

@@ -8,7 +8,7 @@ From the repository root on Windows:
 
 ```powershell
 uv venv .runtime/docs-venv --python 3.12
-uv pip sync docs/requirements.txt --python .runtime/docs-venv/Scripts/python.exe
+uv pip sync docs/requirements.txt --require-hashes --python .runtime/docs-venv/Scripts/python.exe
 .runtime/docs-venv/Scripts/python.exe -m mkdocs serve --dev-addr 127.0.0.1:8765
 ```
 
@@ -30,7 +30,7 @@ The output is written to ignored `.runtime/docs-site`. Strict mode treats missin
 4. Run the strict build, then check the changed page on a desktop and a narrow screen. Check tables, code blocks, search results, and heading links.
 5. Keep outcomes and limitations together. Recorded verification is evidence from a particular run, not a guarantee that every deployment has passed it.
 
-Use fictional examples. Keep passwords, API keys, invitation tokens, customer information, private assignment text, and raw recordings out of documentation. The existing dashboard screenshot is excluded from the website because it identifies the local operator.
+Use fictional examples. Keep passwords, API keys, invitation tokens, customer information, private project material, and raw recordings out of documentation. The existing dashboard screenshot is excluded from the website because it identifies the local operator.
 
 ## Dependency updates
 
@@ -38,18 +38,35 @@ Use fictional examples. Keep passwords, API keys, invitation tokens, customer in
 
 ```powershell
 uv pip compile docs/requirements.in --python-version 3.12 --universal --output-file docs/requirements.txt --generate-hashes
-uv pip sync docs/requirements.txt --python .runtime/docs-venv/Scripts/python.exe
+uv pip sync docs/requirements.txt --require-hashes --python .runtime/docs-venv/Scripts/python.exe
 .runtime/docs-venv/Scripts/python.exe -m mkdocs build --strict
 ```
 
 The website uses system fonts and the project's original SVG mark. It does not publish the Switzer font binary. Search runs in the browser; the site does not need an application server or analytics service. Mermaid loads its renderer when the architecture page is opened.
 
-## Read the Docs configuration
+## Hosting and publication
 
-`.readthedocs.yaml` selects Ubuntu 24.04, Python 3.12, the locked requirements, and a strict MkDocs build. On Read the Docs, `READTHEDOCS_CANONICAL_URL` supplies the canonical URL. No deployment URL is hardcoded or assumed to be live.
+The [documentation website](https://commerce-console-docs.readthedocs.io/en/latest/) is hosted on Read the Docs Community. Its source is the separate [documentation repository](https://github.com/satwiksps/commerce-console-docs). The application repository remains private. The MIT license in the documentation repository covers the documentation and original documentation assets only.
 
-Read the Docs Community accepts public repositories for open source documentation. Private repositories require its paid Business platform. This project's application repository is private. Publication therefore requires a suitable account and an explicitly approved documentation source; the configuration alone does not publish a site or change repository visibility. See the [platform comparison](https://about.readthedocs.com/choosing-a-platform/) and [project import guide](https://docs.readthedocs.com/platform/stable/intro/add-project.html).
+`.readthedocs.yaml` selects Ubuntu 24.04, Python 3.12, the locked requirements, and a strict MkDocs build. `READTHEDOCS_CANONICAL_URL` supplies the canonical URL during hosted builds. The `latest` version follows the documentation repository's `main` branch. GitHub sends signed webhook events to Read the Docs so pushes rebuild the website. GitHub Actions independently checks the strict build.
 
-If a separate documentation repository is approved, include `docs/`, `mkdocs.yml`, `.readthedocs.yaml`, the chosen documentation license, a `.gitignore` covering `.runtime/`, and a documentation-only CI workflow. Exclude the operator screenshot, generated site, runtime files, assignment file, application source, and application Git history. Keep documentation changes synchronized with the application revision they describe.
+The source pages are maintained alongside the application. From the private application checkout, publish reviewed changes with the export script:
 
-After importing that source, verify a successful Read the Docs build and its actual website URL. Use that verified URL for the application README. Configure the repository integration so documentation commits trigger new builds, then verify a webhook delivery and a rebuilt page. Do not advertise an unverified or guessed address.
+```powershell
+.runtime/docs-venv/Scripts/python.exe -m mkdocs build --strict
+uv run python scripts/export-docs.py
+git -C .runtime/docs-publication status --short
+git -C .runtime/docs-publication diff
+```
+
+The exporter copies an explicit file list into `.runtime/docs-publication` and preserves that checkout's independent Git history. It rejects linked paths, unexpected destination files, and restricted project references. A hash manifest stays beside the export in the private `.runtime` directory. New documentation files must be added to the export list as well as the site navigation.
+
+Review the diff before committing and pushing the documentation checkout's `main` branch. Its remote must be `https://github.com/satwiksps/commerce-console-docs.git`. On a new workstation, first clone that repository into `.runtime/docs-publication`, then run the exporter. Never use the application checkout or its Git history as the public documentation source.
+
+After a push, check [GitHub Actions](https://github.com/satwiksps/commerce-console-docs/actions) and [Read the Docs builds](https://app.readthedocs.org/projects/commerce-console-docs/builds/), then open the changed page on the website. A successful local build does not confirm that hosting has updated. If a build does not start, inspect the GitHub webhook's recent deliveries and the project's Read the Docs integration activity.
+
+## Publication boundaries
+
+The export excludes application source, application Git history, credentials, the operator screenshot, generated pages, and private runtime records. Keep examples fictional and review each change for identifying details before publication.
+
+Each page requests `noindex, nofollow, noarchive` through its robots meta tag. `robots.txt` permits crawling so search engines can read that request. These directives reduce indexing by cooperating search engines; they do not restrict access to the public website or GitHub repository.

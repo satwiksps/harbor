@@ -11,7 +11,31 @@ Use PowerShell 7 from the repository root. Docker Desktop must be running Linux 
 ./scripts/bootstrap.ps1
 ```
 
-Helm 4.3.1 and k3d 5.9.0 are installed only in `.tools`, with SHA256 checks against official release files. The cluster is `urumi-commerce`, the kubectl context is `k3d-urumi-commerce`, and the namespace and release are both `commerce`. The server uses the tested `rancher/k3s:v1.35.5-k3s1` image and a 6 GiB memory cap. Existing Docker containers and clusters are not removed.
+Helm 4.3.1 and k3d 5.9.0 are installed only in `.tools`, with SHA256 checks against official release files. Bootstrap selects the dedicated project cluster's kubectl context. The namespace and release are both `commerce`. The server uses the tested `rancher/k3s:v1.35.5-k3s1` image and a 6 GiB memory cap. Existing Docker containers and clusters are not removed.
+
+### Select the local context
+
+The commands in this guide use the selected kubectl context. Before running them, inspect the available contexts and select the one created by bootstrap. Do not use a production or unrelated project context.
+
+```powershell
+kubectl config get-contexts
+kubectl config current-context
+$projectContext = Read-Host 'Context created by the project bootstrap'
+kubectl config use-context $projectContext
+kubectl -n commerce get deployments
+```
+
+For the Docker diagnostics later in this guide, list k3d nodes and record the actual server and load-balancer names belonging to that same project cluster. Do not rename the cluster or infer names from the examples.
+
+```powershell
+.tools/k3d.exe node list
+$projectServer = Read-Host 'Project server container name from the list'
+$projectLoadBalancer = Read-Host 'Project load-balancer container name from the list'
+```
+
+Keep those variables in the same PowerShell session. Check the cluster and role columns before selecting the names.
+
+### Credentials and local access
 
 `bootstrap.ps1` creates random credentials in the access-restricted, ignored `.secrets/development.json`, creates Kubernetes Secrets, builds and imports three images, and installs the chart. Put a Gemini key in `.secrets/gemini-api-key.txt` first, or configure it later and rerun bootstrap. No script prints passwords. Keep the generated credential file: changing it does not rotate credentials already stored in PostgreSQL or MariaDB.
 
@@ -28,7 +52,7 @@ Only Traefik ingress and the Kubernetes administration API are published, both o
 
 Older clusters created before the loopback fix retain their original Docker bindings. Startup refuses to resume such a cluster automatically. During an idle maintenance window, take a backup with `./scripts/backup.ps1`, preview `./scripts/limit-local-bindings.ps1`, then run it with `-Apply`. This uses k3d's port-edit operation to replace only the project's load balancer twice: first remove its wildcard publications, then add loopback publications at the same ports. The k3s server and its data volumes stay in place. The helper checks that the server ID, start time and mounts did not change, and changes only the project's kubeconfig API address to `127.0.0.1`. If interrupted between those steps, rerun the same command; `.runtime/local-binding-migration.json` retains the non-sensitive API port and server identity needed to finish. Do not delete the cluster to change bindings.
 
-Inspect the final result with `docker inspect k3d-urumi-commerce-serverlb --format '{{json .HostConfig.PortBindings}}'`. All three entries must use `127.0.0.1`. Confirm that the dashboard and API work on loopback and that connecting to the host's non-loopback address fails. Do not dump all container labels or environment variables, which can contain cluster credentials.
+Inspect the final result with `docker inspect $projectLoadBalancer --format '{{json .HostConfig.PortBindings}}'`, using the container selected above. All three entries must use `127.0.0.1`. Confirm that the dashboard and API work on loopback and that connecting to the host's non-loopback address fails. Do not dump all container labels or environment variables, which can contain cluster credentials.
 
 ```powershell
 # Rebuild and deploy after a source change.
@@ -60,6 +84,10 @@ No public VPS deployment is claimed. These steps describe the production-like ta
 Example discovery commands:
 
 ```sh
+kubectl config get-contexts
+kubectl config current-context
+# Select the intended VPS context before continuing.
+kubectl config use-context CONTEXT_NAME
 kubectl get service kubernetes -n default -o jsonpath='{.spec.clusterIP}'
 kubectl get nodes -o wide
 kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.spec.podCIDRs}{"\n"}{end}'
@@ -97,7 +125,7 @@ Keep Traefik's `forwardedHeaders.insecure` disabled and leave `forwardedHeaders.
 The gateway Role can get and patch only `commerce-upstream-credentials`. It cannot list Secrets, read `commerce-app-secrets`, or create deployments. Each bundled upstream reads its own service authentication token from `commerce-app-secrets`; the gateway keeps a separate mutable copy. Editing or deleting a registry credential therefore cannot remove a token required for an upstream pod to start. To rotate a bundled service token, update its protected application Secret value, restart that service, and update its gateway credential. Application credentials are referenced through Secrets instead of being embedded in Helm values or release manifests. Kubernetes Secrets are not encryption by themselves; the cluster must enable encryption at rest. The local creation script includes the k3s flag, and the existing local cluster was migrated using the [official existing-cluster procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster).
 
 ```powershell
-docker exec k3d-urumi-commerce-server-0 k3s secrets-encrypt status
+docker exec $projectServer k3s secrets-encrypt status
 kubectl auth can-i get secret/commerce-upstream-credentials --as=system:serviceaccount:commerce:commerce-gateway -n commerce
 kubectl auth can-i get secret/commerce-app-secrets --as=system:serviceaccount:commerce:commerce-gateway -n commerce
 kubectl auth can-i list secrets --as=system:serviceaccount:commerce:commerce-gateway -n commerce
@@ -162,12 +190,12 @@ After verification, all eight deployments were ready, all three registered conne
 
 Use `stop.ps1` and `bootstrap.ps1` for the normal local lifecycle. Resuming an existing cluster now checks the host API with bounded retries and refreshes only the project load balancer if the API is healthy inside the node but unavailable on the host. Deployment then recomputes the narrow API-server egress CIDR. Missing local credentials with retained project Secrets or volumes stop bootstrap instead of silently generating new database passwords. The isolated recovery and credential-guard cases can be run with `pwsh -File scripts/test-local-recovery.ps1`.
 
-A manual `docker restart` of only the k3d server can change its Docker-network IP while the project load balancer still caches the old address. For that specific condition outside normal bootstrap, restart only `k3d-urumi-commerce-serverlb`, wait for its proxy to start, then run `deploy.ps1`. Node readiness alone does not prove upstream credentials are reachable. Do not restart Docker Desktop or delete other containers as a workaround.
+A manual `docker restart` of only the k3d server can change its Docker-network IP while the project load balancer still caches the old address. For that specific condition outside normal bootstrap, restart only the project's load-balancer container selected in [the local context procedure](#select-the-local-context), wait for its proxy to start, then run `deploy.ps1`. Node readiness alone does not prove upstream credentials are reachable. Do not restart Docker Desktop or delete other containers as a workaround.
 
 ```powershell
-docker exec k3d-urumi-commerce-server-0 kubectl get --raw /readyz
+docker exec $projectServer kubectl get --raw /readyz
 # Only when diagnosing that specific stale proxy condition:
-docker restart k3d-urumi-commerce-serverlb
+docker restart $projectLoadBalancer
 ./scripts/deploy.ps1
 ```
 

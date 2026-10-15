@@ -1,8 +1,17 @@
-# Visual direction and asset provenance
+# Visual design and asset provenance
 
-The reference is the public HTML and inline CSS at [urumi.ai](https://urumi.ai/), inspected on 15 October 2026. This is an independent assignment project called **Commerce console**. It does not use Urumi's logo, testimonials, business metrics, or product claims.
+Commerce Console uses a quiet sidebar, generous whitespace, compact operational tables, restrained color, and a chat workspace with live connection context. The application mark and layout are original to this project.
 
-The site's observed design tokens are a warm `#F3F2ED` background, `#121517` foreground, `#136B69` teal accent, and `#D6D3C8` borders. It uses Switzer for text and JetBrains Mono for technical details. The console carries these cues into an original application layout: a quiet sidebar, generous whitespace, compact operational tables, restrained color, and a chat workspace with live connection context.
+## Design tokens
+
+| Token | Value | Use |
+| --- | --- | --- |
+| Canvas | `#F3F2ED` | Warm background |
+| Foreground | `#121517` | Main text |
+| Accent | `#136B69` | Primary actions and selected controls |
+| Border | `#D6D3C8` | Panels and dividers |
+
+The dashboard uses Switzer for interface text and JetBrains Mono for technical details. The documentation website uses system fonts and the project's SVG mark, with the same restrained palette.
 
 ## Fonts
 

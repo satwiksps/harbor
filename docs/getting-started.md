@@ -45,7 +45,7 @@ pwsh -File scripts/bootstrap.ps1
 
 Initial setup takes several minutes. The script:
 
-1. Verifies the local tools and starts the dedicated `urumi-commerce` cluster.
+1. Verifies the local tools and starts the dedicated project cluster.
 2. Generates random credentials in `.secrets/development.json` and creates Kubernetes Secrets.
 3. Builds and imports the application, dashboard and WordPress images.
 4. Installs the Helm chart and initializes the store and gateway.

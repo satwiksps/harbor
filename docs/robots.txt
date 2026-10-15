@@ -1,0 +1,3 @@
+# Crawlers must be able to read each page's noindex meta tag.
+User-agent: *
+Allow: /

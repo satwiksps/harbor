@@ -100,4 +100,4 @@ The application CI job runs locked dependency installation, Python checks, dispo
 
 The system deliberately uses one store, one gateway replica and process-local rate limits. Public deployment requires TLS, secure cookies, cluster Secret encryption and protected backups. Production values are a template; they do not demonstrate a deployed VPS. Schema migrations are forward-only until an explicit rollback migration exists.
 
-Keep credentials, raw runtime evidence, recordings and the private assignment outside commits. Before sharing a demo, use the [demo checklist](demo.md) to review it for passwords, keys and invitation tokens.
+Keep credentials, raw runtime evidence, recordings and private project material outside commits. Before sharing a demo, use the [walkthrough checklist](demo.md) to review it for passwords, keys and invitation tokens.

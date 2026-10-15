@@ -7,6 +7,7 @@ strict: true
 
 theme:
   name: material
+  custom_dir: docs/theme
   language: en
   logo: assets/mark.svg
   favicon: assets/mark.svg
@@ -71,8 +72,9 @@ exclude_docs: |
   requirements.in
   requirements.txt
   assets/console.png
+  theme/
 
 extra_css:
   - stylesheets/extra.css
 
-copyright: Independent engineering project. Not an official Urumi product.
+copyright: Commerce Console documentation.

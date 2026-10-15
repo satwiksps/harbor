@@ -50,4 +50,4 @@ Source scanning checks for committed private files, known credential values, bro
 
 The tested deployment is local and single-node. Public TLS, a VPS deployment, sustained load, browser engines other than Chromium, and restoration from a backup need separate validation. The prior pod replacement and Helm configuration rollback checks do not prove database backup restoration. Free Gemini quota and availability remain external dependencies.
 
-The repository remains private. Reviewer access and a human-narrated demonstration must be arranged before submission. No email delivery, carrier integration, high availability or automated submission is presented as implemented functionality.
+The application repository remains private. No email delivery, carrier integration or high availability is presented as implemented functionality.
