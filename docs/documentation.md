@@ -2,7 +2,7 @@
 
 The documentation lives alongside the application in the private main repository. MkDocs and the Material theme turn `docs/` into a static website. `mkdocs.yml` defines navigation, styling, search and link validation. Documentation changes can be reviewed in the same commit as the behavior they describe.
 
-Cloudflare Pages builds the site from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
+Cloudflare Pages builds the [documentation website](https://commerce-console-docs.pages.dev/) from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
 
 ## Preview locally
 
@@ -55,16 +55,17 @@ Configure the Pages project with these values:
 | Setting | Value |
 | --- | --- |
 | Production branch | `main` |
+| Preview branches | None |
 | Root directory | Repository root |
 | Build command | `pip install --require-hashes -r docs/requirements.txt && python scripts/build-docs.py` |
 | Build output directory | `.runtime/docs-site` |
 | `PYTHON_VERSION` | `3.12` |
 | `SKIP_DEPENDENCY_INSTALL` | `1` |
-| `DOCS_SITE_URL` | The verified public site URL, including `https://` and a trailing slash |
+| `DOCS_SITE_URL` | `https://commerce-console-docs.pages.dev/` |
 
 The custom build command installs only the locked documentation dependencies. `SKIP_DEPENDENCY_INSTALL` prevents automatic installation of the application's dependency set. See Cloudflare's [build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [dependency installation setting](https://developers.cloudflare.com/pages/configuration/build-image/#skip-dependency-install).
 
-Set `DOCS_SITE_URL` after confirming the assigned address in the Pages project. MkDocs uses it for canonical URLs. Local builds can leave it unset. Do not substitute an unverified address or a deployment-specific preview URL for the stable site address.
+MkDocs uses `DOCS_SITE_URL` for canonical URLs. Local builds can leave it unset. If the site moves, update this value and the README links after confirming the new production address. Do not substitute a deployment-specific preview URL for the stable site address. Automatic preview builds are disabled so unmerged branches do not publish additional copies of the documentation.
 
 For [build watch paths](https://developers.cloudflare.com/pages/configuration/build-watch-paths/), include `docs/*`, `mkdocs.yml` and `scripts/build-docs.py`. A single trailing `*` includes nested paths in Pages. These paths cover content, assets, dependency locks and build validation, while ordinary application-only changes can skip a website build. Update the list if a new file outside these paths affects the documentation output.
 
