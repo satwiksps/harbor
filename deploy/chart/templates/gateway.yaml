@@ -1,3 +1,11 @@
+{{- if and .Values.gateway.trustedProxyCidrs (not .Values.networkPolicy.enabled) }}
+{{- fail "gateway.trustedProxyCidrs requires networkPolicy.enabled so only the ingress controller can supply forwarding headers" }}
+{{- end }}
+{{- range .Values.gateway.trustedProxyCidrs }}
+{{- if or (eq . "*") (eq . "0.0.0.0/0") (eq . "::/0") }}
+{{- fail "gateway.trustedProxyCidrs must contain only the ingress node pod CIDRs, never all addresses" }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,10 +28,11 @@ spec:
         - name: gateway
           image: {{ .Values.images.app }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
-          command: [/app/.venv/bin/uvicorn, backend.app:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
+          command: [/app/.venv/bin/uvicorn, backend.app:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --no-access-log]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
           ports: [{containerPort: 8000, name: http}]
           env:
+            - {name: FORWARDED_ALLOW_IPS, value: {{ join "," .Values.gateway.trustedProxyCidrs | quote }}}
             - name: DATABASE_URL
               valueFrom: {secretKeyRef: {name: {{ .Values.secrets.application }}, key: database_url}}
             - name: SESSION_SECRET

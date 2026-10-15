@@ -49,3 +49,4 @@ foreach ($case in @('new-install', 'retained-data', 'api-error')) {
 }
 # Expected mocked failures must not become the GitHub PowerShell step's exit code.
 $global:LASTEXITCODE = 0
+& "$PSScriptRoot/test-local-bindings.ps1"

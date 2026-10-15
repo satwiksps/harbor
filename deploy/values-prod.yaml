@@ -17,6 +17,8 @@ urls:
   store: https://store.example.com
 gateway:
   secureCookies: true
+  # Pod CIDR of the node running Traefik. Keep the ingress NetworkPolicy enabled.
+  trustedProxyCidrs: [10.42.0.0/24]
 storage:
   className: local-path
   wordpress: 10Gi

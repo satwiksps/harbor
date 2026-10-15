@@ -32,6 +32,9 @@ gateway:
   adminEmail: admin@urumi.local
   adminName: Satwik
   secureCookies: false
+  # Single-node k3s pod range. NetworkPolicy also restricts callers to Traefik.
+  # Local deploy.ps1 discovers the node's actual range; verify it for other clusters.
+  trustedProxyCidrs: [10.42.0.0/24]
   resources:
     requests: {cpu: 150m, memory: 192Mi}
     limits: {cpu: "1", memory: 512Mi}

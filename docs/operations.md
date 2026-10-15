@@ -15,7 +15,7 @@ Helm 4.3.1 and k3d 5.9.0 are installed only in `.tools`, with SHA256 checks agai
 
 `bootstrap.ps1` creates random credentials in the access-restricted, ignored `.secrets/development.json`, creates Kubernetes Secrets, builds and imports three images, and installs the chart. Put a Gemini key in `.secrets/gemini-api-key.txt` first, or configure it later and rerun bootstrap. No script prints passwords. Keep the generated credential file: changing it does not rotate credentials already stored in PostgreSQL or MariaDB.
 
-Local addresses use the loopback-only `.localhost` domain, so an administrator hosts-file edit is unnecessary:
+Local names use the `.localhost` domain, so an administrator hosts-file edit is unnecessary. New clusters explicitly publish ingress ports 8080/8443 and the dynamically assigned Kubernetes API port on `127.0.0.1`. The socket binding, rather than the hostname, limits access to this computer:
 
 | Application | Address |
 | --- | --- |
@@ -24,7 +24,11 @@ Local addresses use the loopback-only `.localhost` domain, so an administrator h
 | Store | `http://store.localhost:8080` |
 | Store admin | `http://store.localhost:8080/wp-admin/` |
 
-Only Traefik ingress is published. The WordPress Service listens on port 80 and forwards to non-root Apache on 8080. Gateway, dashboard, upstreams, and databases are all ClusterIP Services. The upstream port is 8001 and has no Ingress route.
+Only Traefik ingress and the Kubernetes administration API are published, both on loopback. The WordPress Service listens on port 80 and forwards to non-root Apache on 8080. Gateway, dashboard, upstreams, and databases are all ClusterIP Services. The upstream port is 8001 and has no Ingress route.
+
+Older clusters created before the loopback fix retain their original Docker bindings. Startup refuses to resume such a cluster automatically. During an idle maintenance window, take a backup with `./scripts/backup.ps1`, preview `./scripts/limit-local-bindings.ps1`, then run it with `-Apply`. This uses k3d's port-edit operation to replace only the project's load balancer twice: first remove its wildcard publications, then add loopback publications at the same ports. The k3s server and its data volumes stay in place. The helper checks that the server ID, start time and mounts did not change, and changes only the project's kubeconfig API address to `127.0.0.1`. If interrupted between those steps, rerun the same command; `.runtime/local-binding-migration.json` retains the non-sensitive API port and server identity needed to finish. Do not delete the cluster to change bindings.
+
+Inspect the final result with `docker inspect k3d-urumi-commerce-serverlb --format '{{json .HostConfig.PortBindings}}'`. All three entries must use `127.0.0.1`. Confirm that the dashboard and API work on loopback and that connecting to the host's non-loopback address fails. Do not dump all container labels or environment variables, which can contain cluster credentials.
 
 ```powershell
 # Rebuild and deploy after a source change.
@@ -38,7 +42,7 @@ Only Traefik ingress is published. The WordPress Service listens on port 80 and 
 ./scripts/uninstall.ps1
 ```
 
-The deployment script creates `.runtime/values-runtime.yaml` with the actual node IP for API-server egress and a new rollout revision. This makes a local `:dev` image rebuild restart the application pods. Production should use immutable version tags or digests instead.
+The deployment script creates `.runtime/values-runtime.yaml` with the actual node IP for API-server egress, its pod CIDRs for ingress proxy trust, and a new rollout revision. This makes a local `:dev` image rebuild restart the application pods. Production should use immutable version tags or digests instead.
 
 The WordPress bootstrap Job runs after installation and upgrades. It installs WordPress once, activates the packaged WooCommerce and Storefront versions, and creates missing API credentials. Starter products and classic cart/checkout content are initialized only before the `commerce_seed_complete` marker is set; later product deletions and page edits remain intact. It configures INR, the Asia/Kolkata timezone, COD and the sample shipping table, and turns off WooCommerce coming-soon mode so anonymous visitors can browse. If no published privacy page exists, it publishes a short demo data-use notice once and links checkout to it; later edits remain intact. The demo intentionally has no outbound email provider. The original product SVGs are packaged assets; arbitrary SVG uploads are not enabled. Products without media have a labeled typographic card rather than a broken-image icon.
 
@@ -51,13 +55,14 @@ No public VPS deployment is claimed. These steps describe the production-like ta
 1. Install a supported k3s version with Traefik, local-path storage, the network-policy controller, and `--secrets-encryption`. The locally tested version is `v1.35.5+k3s1`. Follow the [official k3s installation guide](https://docs.k3s.io/quick-start); inspect and pin installer inputs for your environment. Keep Secret encryption keys and the cluster token in a protected backup.
 2. Point two DNS names to the server. Provision a certificate and a TLS Secret or install cert-manager separately. TLS is required for real credentials on a public deployment.
 3. Build the three Dockerfiles, tag them with a release version, push to a registry the node can pull, and replace every `REPLACE_OWNER` image in `deploy/values-prod.yaml`. Public images avoid a registry credential; private images require an image-pull Secret and `imagePullSecrets: [{name: registry-credentials}]` in the private values file.
-4. Copy `deploy/values-prod.yaml` to a private values file. Set both hosts, both full public URLs, the TLS Secret, administrator identity, storage class and sizes. Set `networkPolicy.apiServerCidr` to the Kubernetes Service IP `/32` and `apiServerNodeCidr` to the control-plane internal IP `/32`. Default k3s uses `10.43.0.1/32` for the API Service, but verify rather than assuming. Keep `gateway.secureCookies: true`.
+4. Copy `deploy/values-prod.yaml` to a private values file. Set both hosts, both full public URLs, the TLS Secret, administrator identity, storage class and sizes. Set `networkPolicy.apiServerCidr` to the Kubernetes Service IP `/32` and `apiServerNodeCidr` to the control-plane internal IP `/32`. Default k3s uses `10.43.0.1/32` for the API Service, but verify rather than assuming. Set `gateway.trustedProxyCidrs` to only the pod CIDRs of the nodes running Traefik. The one-node default is `10.42.0.0/24`; verify it against the actual node. Keep `gateway.secureCookies: true` and `networkPolicy.enabled: true`.
 
 Example discovery commands:
 
 ```sh
 kubectl get service kubernetes -n default -o jsonpath='{.spec.clusterIP}'
 kubectl get nodes -o wide
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.spec.podCIDRs}{"\n"}{end}'
 kubectl get storageclass
 ```
 
@@ -84,6 +89,10 @@ Confirm application health, login, checkout and an external MCP call after deplo
 Every workload has CPU/memory requests and limits, probes, and a non-root UID. The WordPress init container synchronizes packaged files into the persistent directory without changing its ownership. Containers drop capabilities and privilege escalation; only the gateway mounts a service-account token.
 
 Network policies deny ingress and egress by default. Explicit rules allow DNS; ingress-to-dashboard/gateway/store; gateway-to-upstreams/PostgreSQL; Woo-to-WordPress; and WordPress/bootstrap-to-MariaDB. Gateway egress also allows the configured Kubernetes API endpoint and public TCP 443 for Gemini and administrator-registered HTTPS MCP servers, excluding private/link-local ranges. Application URL validation adds DNS/IP checks and exact internal-host allowlisting. The sample policy and shipping pods cannot access the store or databases.
+
+Uvicorn accepts forwarding headers only from `gateway.trustedProxyCidrs`, with the ingress NetworkPolicy further restricting gateway callers to Traefik pods in the configured namespace. These two controls work together: the CIDR survives an ingress pod restart, while the namespace and pod selector exclude unrelated pods sharing that range. The chart rejects wildcard proxy trust and proxy trust with NetworkPolicy disabled. Kubernetes network-policy enforcement must be enabled. Do not expose the gateway Service directly or grant untrusted users control over the ingress namespace or labels.
+
+Keep Traefik's `forwardedHeaders.insecure` disabled and leave `forwardedHeaders.trustedIPs` empty unless there is a deliberate upstream HTTP proxy. For such a proxy, trust only its exact addresses and require it to sanitize forwarding headers. Preserve the original source IP on a public deployment, for example with Traefik's Service `externalTrafficPolicy: Local` and an appropriate load-balancer configuration. Uvicorn uses the nearest untrusted address in the forwarded chain, so client-supplied prefixes cannot select an arbitrary rate-limit bucket. Local k3d/Docker NAT and users sharing an external NAT may still share an address; the forwarding fix does not invent distinct identities for them. See the [Uvicorn proxy settings](https://uvicorn.dev/settings/#http) and [Traefik forwarded-header configuration](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/#forwarded-headers).
 
 The gateway Role can get and patch only `commerce-upstream-credentials`. It cannot list Secrets, read `commerce-app-secrets`, or create deployments. Each bundled upstream reads its own service authentication token from `commerce-app-secrets`; the gateway keeps a separate mutable copy. Editing or deleting a registry credential therefore cannot remove a token required for an upstream pod to start. To rotate a bundled service token, update its protected application Secret value, restart that service, and update its gateway credential. Application credentials are referenced through Secrets instead of being embedded in Helm values or release manifests. Kubernetes Secrets are not encryption by themselves; the cluster must enable encryption at rest. The local creation script includes the k3s flag, and the existing local cluster was migrated using the [official existing-cluster procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster).
 
