@@ -1,0 +1,78 @@
+site_name: Commerce Console
+site_description: Setup, operations, and engineering documentation for the Commerce Console MCP gateway.
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, ""]
+docs_dir: docs
+site_dir: .runtime/docs-site
+strict: true
+
+theme:
+  name: material
+  language: en
+  logo: assets/mark.svg
+  favicon: assets/mark.svg
+  font: false
+  palette:
+    primary: custom
+    accent: custom
+  features:
+    - navigation.sections
+    - navigation.footer
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+nav:
+  - Overview: index.md
+  - Start here:
+      - Installation: getting-started.md
+      - Using the console: user-guide.md
+      - External MCP clients: external-clients.md
+  - Engineering:
+      - Architecture: system-design.md
+      - API and configuration: CONTRACT.md
+      - Security: threat-model.md
+      - Development and testing: development.md
+  - Operations:
+      - Deployment and recovery: operations.md
+  - Project records:
+      - Verification: verification.md
+      - Audit and corrections: audit.md
+      - Demo walkthrough: demo.md
+      - Design and assets: brand-notes.md
+      - Maintaining the docs: documentation.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    unrecognized_links: warn
+    anchors: warn
+
+exclude_docs: |
+  requirements.in
+  requirements.txt
+  assets/console.png
+
+extra_css:
+  - stylesheets/extra.css
+
+copyright: Independent engineering project. Not an official Urumi product.

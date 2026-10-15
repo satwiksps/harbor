@@ -1,0 +1,115 @@
+:root,
+[data-md-color-scheme="default"] {
+  --md-text-font: "Segoe UI", system-ui, sans-serif;
+  --md-code-font: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --md-primary-fg-color: #136b69;
+  --md-primary-fg-color--light: #217d78;
+  --md-primary-fg-color--dark: #105754;
+  --md-accent-fg-color: #105754;
+  --md-default-bg-color: #f3f2ed;
+  --md-default-fg-color: #121517;
+  --md-default-fg-color--light: #545d56;
+  --md-default-fg-color--lighter: #737b73;
+  --md-typeset-a-color: #136b69;
+  --md-code-bg-color: #eaeae3;
+  --md-code-fg-color: #202927;
+  --md-footer-bg-color: #e8e8df;
+  --md-footer-bg-color--dark: #e0e2d8;
+  --md-footer-fg-color: #121517;
+  --md-footer-fg-color--light: #424f49;
+  --md-footer-fg-color--lighter: #545d56;
+}
+
+.md-header {
+  box-shadow: none;
+  border-bottom: 1px solid #0f5b58;
+}
+
+.md-header__topic {
+  font-weight: 600;
+}
+
+.md-search__input::placeholder {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.md-header__button.md-logo img {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
+.md-main__inner {
+  margin-top: 1.8rem;
+}
+
+.md-typeset {
+  font-size: 0.82rem;
+  line-height: 1.72;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  color: #121517;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.md-typeset h1 {
+  margin-bottom: 1rem;
+}
+
+.md-typeset h2 {
+  border-top: 1px solid #d6d3c8;
+  padding-top: 1.15rem;
+}
+
+.md-typeset a:not(.headerlink):not(.md-button) {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+}
+
+.md-nav__item .md-nav__link--active {
+  font-weight: 650;
+}
+
+.md-typeset table:not([class]) {
+  background-color: #fcfcf9;
+  border-color: #d6d3c8;
+  font-size: 0.75rem;
+}
+
+.md-typeset table:not([class]) th {
+  background: #e8ece4;
+  color: #182c28;
+}
+
+.md-typeset pre > code {
+  border: 1px solid #d6d3c8;
+  border-radius: 4px;
+}
+
+.md-typeset .mermaid {
+  overflow-x: auto;
+  background: #fcfcf9;
+  border: 1px solid #d6d3c8;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+label[tabindex]:focus-visible {
+  outline: 3px solid #ad5f14;
+  outline-offset: 3px;
+}
+
+@media (max-width: 76.234375em) {
+  .md-nav--primary .md-nav__title {
+    color: #fff;
+  }
+}
+

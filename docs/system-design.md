@@ -5,7 +5,20 @@ Commerce Console is a single-team WooCommerce operations workspace. It demonstra
 ## Components
 
 ```mermaid
-flowchart LR
+---
+config:
+  flowchart:
+    useMaxWidth: false
+  theme: base
+  themeVariables:
+    primaryColor: "#e8ece4"
+    primaryBorderColor: "#136b69"
+    primaryTextColor: "#121517"
+    lineColor: "#545d56"
+---
+flowchart TB
+    accTitle: Commerce Console request and storage paths
+    accDescr: Dashboard sessions and external API keys reach the FastAPI application and MCP gateway. Chat executes tools through the same gateway. Three upstreams provide commerce, policies and shipping; commerce calls WooCommerce. PostgreSQL, MariaDB and WordPress content use persistent volumes.
     UI[React dashboard] -->|Session cookie + CSRF| API[FastAPI application]
     CLI[External MCP client] -->|Personal bearer key| GW[MCP gateway]
     API --> CHAT[Gemini tool loop]
@@ -20,6 +33,8 @@ flowchart LR
     WP --> DB[(MariaDB PVC)]
     WP --> FILES[(WordPress content PVC)]
 ```
+
+Scroll within the diagram to inspect all components. The descriptions below explain each path.
 
 The React dashboard is served as a static application. FastAPI contains the identity, registry, gateway, chat and audit modules in one deployment. PostgreSQL stores users, hashed keys, sessions, invitations, server metadata, tool catalogues, permissions, pending confirmations and audit records. The store runs WordPress with WooCommerce and its own MariaDB database. WordPress content, MariaDB and PostgreSQL each have persistent volumes.
 

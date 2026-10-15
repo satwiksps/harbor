@@ -4,7 +4,7 @@ Aim for a focused 10 to 12 minute recording. Use the real Kubernetes deployment,
 
 ## Prepare
 
-- Start the cluster and run the verification checks in README.
+- Start the cluster using [getting started](getting-started.md), then run the relevant checks in [development](development.md).
 - Sign in as the administrator in the first browser and the demo member in a separate browser profile. Generate the external-client key before recording, and keep the key dialog and private files out of frame.
 - Configure the MCP client using the member's URL and key. Test that all seven read tools appear, including the two distinct `search` tools.
 - Choose a unique product name and SKU for this recording. Have a fictional Indian checkout address ready. Set browser zoom to 100 percent.
@@ -14,7 +14,7 @@ Aim for a focused 10 to 12 minute recording. Use the real Kubernetes deployment,
 
 1. **Architecture, one minute.** Show the diagram in the design note. The browser talks to the gateway API; chat and external clients use the same MCP endpoint. Only the gateway reaches the three internal MCP servers. The commerce server signs requests to WooCommerce REST. WordPress, MariaDB and PostgreSQL have persistent volumes.
 2. **Admin chat and checkout, three minutes.** Ask chat to create your unique product at a specific price. Expand the proposed write arguments, approve, and show the successful tool result. Open its storefront page, add it to the cart and complete COD checkout. Show the order in WordPress admin. Ask chat for today's orders and point to this order and its tool call.
-3. **Member and two upstreams, two minutes.** Switch to the member's external client. Show the tool names and that create/update tools are absent. Ask today's orders. Run the shipping-policy-plus-quote prompt from README. Show both upstream tool results. Explain that the external client has only a gateway URL and one personal key.
+3. **Member and two upstreams, two minutes.** Switch to the member's external client. Show the tool names and that create/update tools are absent. Ask today's orders. Run the shipping-policy-plus-quote prompt from the [user guide](user-guide.md#connect-an-external-client). Show both upstream tool results. Explain that the external client has only a gateway URL and one personal key.
 4. **Control and isolation, two minutes.** Disable Shipping in Connections, refresh external discovery and show its tools disappear. Read the returns policy successfully. Re-enable Shipping. Revoke the member's key and show that the next request is rejected. Show Activity with both users and success/denied outcomes.
 5. **Failure and Kubernetes, two minutes.** Hold one upstream down with `kubectl -n commerce scale deployment/policies-mcp --replicas=0`, then wait for the dashboard to show Unreachable. Call a commerce or shipping tool successfully. Restore with `--replicas=1`. Scaling to zero holds the failure long enough to observe it; Kubernetes normally replaces a killed pod quickly. Also show a pod deletion and its replacement. Show pods, PVCs, Ingress and the RBAC/NetworkPolicy manifests, without displaying Secret data.
 6. **Production and tradeoffs, one minute.** Compare local and production values. Explain DNS, TLS, images, storage and cluster Secret encryption. Describe backup before upgrade and why Helm rollback does not restore database contents. State which bonuses are complete and what is deliberately omitted.

@@ -2,7 +2,7 @@
 
 An external client needs one MCP URL ending in `/mcp` and a member API key. It never receives WooCommerce keys or private upstream credentials.
 
-Verification uses MCP Inspector 2.11.0 as the named third-party protocol client and [a standalone external agent](../examples/ask_gateway.py) for the natural-language requirement. The agent uses the official MCP and Google Gen AI SDKs. It imports no backend code, discovers its tools over HTTP, and authenticates every gateway request with the member key. Its model has no shell, filesystem, browser, or direct upstream tools.
+Verification uses MCP Inspector 2.11.0 as the named third-party protocol client and a standalone external agent at `examples/ask_gateway.py` in the private application repository for the natural-language requirement. The agent uses the official MCP and Google Gen AI SDKs. It imports no backend code, discovers its tools over HTTP, and authenticates every gateway request with the member key. Its model has no shell, filesystem, browser, or direct upstream tools.
 
 ## Run the acceptance harness
 
