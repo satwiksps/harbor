@@ -1,5 +1,5 @@
 [project]
-name = "commerce-console"
+name = "harbor"
 version = "0.1.0"
 description = "A team MCP gateway for WooCommerce operations"
 requires-python = ">=3.12,<3.13"

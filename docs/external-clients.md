@@ -40,7 +40,7 @@ This mode explicitly records that the natural-language agent was not attempted.
 Use the member's gateway key from Team & keys. These PowerShell commands avoid putting the secret in command history:
 
 ```powershell
-$env:GATEWAY_URL = 'http://console.localhost:8080/mcp'
+$env:GATEWAY_URL = 'http://harbor.localhost:8080/mcp'
 $env:GATEWAY_API_KEY = Read-Host -MaskInput 'Member gateway key'
 $env:GEMINI_API_KEY = (Get-Content -Raw .secrets/gemini-api-key.txt).Trim()
 uv run python examples/ask_gateway.py --prompt "Read today's orders and the shipping policy. Which orders qualify for free shipping? Use both upstreams and cite actual order IDs and policy version."
@@ -49,7 +49,7 @@ Remove-Item Env:GATEWAY_API_KEY, Env:GEMINI_API_KEY
 
 The exact model is `gemini-3.1-flash-lite`, with low thinking and no automatic model substitution. Google lists [free input and output for its standard API tier](https://ai.google.dev/gemini-api/docs/pricing). Quota and availability depend on the account. The agent reports quota or provider failures honestly, never rotates keys, and never enables billing.
 
-The process has a 120-second agent deadline, 45 seconds per model request, at most six rounds and eight tool calls. Provider retries are disabled. Only explicitly read-only discovered tools are offered to the model. Every request also sends `X-Commerce-Read-Only: true`, so the gateway rejects a tool reclassified as a write while the model was thinking, even if the supplied key belongs to an administrator. The gateway independently enforces current user permissions on every call. The acceptance subprocess has an additional 150-second bound and terminates descendants on timeout.
+The process has a 120-second agent deadline, 45 seconds per model request, at most six rounds and eight tool calls. Provider retries are disabled. Only explicitly read-only discovered tools are offered to the model. Every request also sends `X-Harbor-Read-Only: true`, so the gateway rejects a tool reclassified as a write while the model was thinking, even if the supplied key belongs to an administrator. The gateway independently enforces current user permissions on every call. The acceptance subprocess has an additional 150-second bound and terminates descendants on timeout.
 
 ## MCP Inspector configuration
 
@@ -58,9 +58,9 @@ Inspector 2.11 uses `type: "http"` for Streamable HTTP:
 ```json
 {
   "mcpServers": {
-    "commerce": {
+    "harbor": {
       "type": "http",
-      "url": "http://console.localhost:8080/mcp",
+      "url": "http://harbor.localhost:8080/mcp",
       "protocolEra": "auto",
       "headers": {"Authorization": "Bearer <MEMBER_GATEWAY_KEY>"},
       "connectionTimeout": 15000,

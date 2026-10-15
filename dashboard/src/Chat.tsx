@@ -181,7 +181,7 @@ export function Chat({
         <div className="chat-heading">
           <div>
             <p className="eyebrow">WORKSPACE CHAT</p>
-            <h1>Your commerce assistant.</h1>
+            <h1>Your Harbor assistant.</h1>
           </div>
           <button
             className="button secondary small"
@@ -261,7 +261,7 @@ export function Chat({
                   <div className="message-body">
                     <div className="message-label">
                       {message.role === "assistant"
-                        ? "Commerce assistant"
+                        ? "Harbor assistant"
                         : user.name}
                       {message.role === "assistant" && (
                         <span>via your gateway</span>
@@ -365,7 +365,7 @@ export function Chat({
           )}
           <form className="composer" onSubmit={send}>
             <label className="sr-only" htmlFor="chat-message">
-              Message the commerce assistant
+              Message the Harbor assistant
             </label>
             <textarea
               id="chat-message"

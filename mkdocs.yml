@@ -1,5 +1,5 @@
-site_name: Commerce Console
-site_description: Setup, operations, and engineering documentation for the Commerce Console MCP gateway.
+site_name: Harbor
+site_description: Setup, operations, and engineering documentation for the Harbor MCP gateway.
 site_url: !ENV [DOCS_SITE_URL, ""]
 docs_dir: docs
 site_dir: .runtime/docs-site
@@ -77,4 +77,4 @@ exclude_docs: |
 extra_css:
   - stylesheets/extra.css
 
-copyright: Commerce Console documentation.
+copyright: Harbor documentation.

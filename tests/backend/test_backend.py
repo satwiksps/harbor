@@ -165,7 +165,7 @@ async def test_csrf_invites_and_team_isolation(environment):
 
 async def test_accept_invite_replaces_only_presented_admin_session(environment):
     app, http = environment
-    old_cookie = http.cookies.get("commerce_session")
+    old_cookie = http.cookies.get("harbor_session")
     old_csrf = http.headers["X-CSRF-Token"]
     old_principal = authenticate(app.state.db, app.state.settings, cookie=old_cookie)
     old_delegation = delegate(app.state.settings.session_secret, old_principal.session_id)
@@ -193,7 +193,7 @@ async def test_accept_invite_replaces_only_presented_admin_session(environment):
         assert auth["user"]["email"] == "invited@example.test"
         assert auth["user"]["role"] == "member"
         assert auth["user"]["id"] != old_principal.id
-        assert http.cookies.get("commerce_session") != old_cookie
+        assert http.cookies.get("harbor_session") != old_cookie
         assert auth["csrf_token"] != old_csrf
         assert "HttpOnly" in accepted.headers["set-cookie"]
         assert "SameSite=lax" in accepted.headers["set-cookie"]
@@ -202,7 +202,7 @@ async def test_accept_invite_replaces_only_presented_admin_session(environment):
 
         # The old browser cookie and its delegated chat credential lose authority together.
         assert (
-            await http.get("/api/auth/me", headers={"Cookie": f"commerce_session={old_cookie}"})
+            await http.get("/api/auth/me", headers={"Cookie": f"harbor_session={old_cookie}"})
         ).status_code == 401
         assert (
             await http.post(
@@ -260,7 +260,7 @@ async def test_accept_invite_without_session_signs_in_invited_user(environment):
 async def test_rejected_invite_preserves_current_session(environment, kind):
     app, http = environment
     original_auth = (await http.get("/api/auth/me")).json()
-    original_cookie = http.cookies.get("commerce_session")
+    original_cookie = http.cookies.get("harbor_session")
     token = "not-an-invitation"
     if kind != "invalid":
         invitation = await http.post(
@@ -286,14 +286,14 @@ async def test_rejected_invite_preserves_current_session(environment, kind):
     )
     assert rejected.status_code == 404
     assert "set-cookie" not in rejected.headers
-    assert http.cookies.get("commerce_session") == original_cookie
+    assert http.cookies.get("harbor_session") == original_cookie
     assert (await http.get("/api/auth/me")).json() == original_auth
     assert (await http.get("/api/members")).status_code == 200
 
 
 async def test_successful_login_rotates_presented_session(environment):
     app, http = environment
-    old_cookie = http.cookies.get("commerce_session")
+    old_cookie = http.cookies.get("harbor_session")
     old_csrf = http.headers["X-CSRF-Token"]
     login = await http.post(
         "/api/auth/login",
@@ -303,10 +303,10 @@ async def test_successful_login_rotates_presented_session(environment):
         },
     )
     assert login.status_code == 200
-    assert http.cookies.get("commerce_session") != old_cookie
+    assert http.cookies.get("harbor_session") != old_cookie
     assert login.json()["csrf_token"] != old_csrf
     assert (
-        await http.get("/api/auth/me", headers={"Cookie": f"commerce_session={old_cookie}"})
+        await http.get("/api/auth/me", headers={"Cookie": f"harbor_session={old_cookie}"})
     ).status_code == 401
     assert (await http.get("/api/auth/me")).json() == login.json()
 
@@ -314,7 +314,7 @@ async def test_successful_login_rotates_presented_session(environment):
 async def test_conflicting_invite_acceptance_rolls_back_without_session_change(environment):
     app, http = environment
     original_auth = (await http.get("/api/auth/me")).json()
-    original_cookie = http.cookies.get("commerce_session")
+    original_cookie = http.cookies.get("harbor_session")
     invitation = await http.post(
         "/api/invites", json={"email": "conflict@example.test", "role": "member"}
     )
@@ -335,14 +335,15 @@ async def test_conflicting_invite_acceptance_rolls_back_without_session_change(e
     )
     assert rejected.status_code == 409
     assert "set-cookie" not in rejected.headers
-    assert http.cookies.get("commerce_session") == original_cookie
+    assert http.cookies.get("harbor_session") == original_cookie
     assert (await http.get("/api/auth/me")).json() == original_auth
     with app.state.db.session() as session:
         row = session.scalar(select(Invite).where(Invite.token_hash == digest(token)))
         assert row.accepted_at is None
 
 
-async def test_real_mcp_sdk_permissions_revocation_and_audit(environment, monkeypatch):
+@pytest.mark.parametrize("legacy_key", [False, True])
+async def test_real_mcp_sdk_permissions_revocation_and_audit(environment, monkeypatch, legacy_key):
     app, admin_http = environment
     upstream_id = seed_upstream(app)
     member, user = await member_client(app, admin_http)
@@ -363,10 +364,16 @@ async def test_real_mcp_sdk_permissions_revocation_and_audit(environment, monkey
     async with use_client(member):
         key_response = (await member.post("/api/keys", json={"name": "external"})).json()
         token = key_response["key"]
+        assert token.startswith("harbor_")
         with app.state.db.session() as session:
             key = session.get(ApiKey, key_response["record"]["id"])
             assert key.token_hash == digest(token)
             assert token not in str(key.__dict__)
+            if legacy_key:
+                # Previously issued keys retain their stored hash through the rename.
+                token = "cc_" + token.removeprefix("harbor_")
+                key.token_hash = digest(token)
+                key.prefix = token[:12]
         async with httpx2.AsyncClient(
             transport=httpx2.ASGITransport(app=app), headers={"Authorization": f"Bearer {token}"}
         ) as mcp_http:
@@ -400,7 +407,7 @@ async def test_gateway_schema_timeout_and_failure_isolation(environment, monkeyp
     dead_id = seed_upstream(app, "woo")
     healthy_id = seed_upstream(app, "policies")
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=admin_http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=admin_http.cookies.get("harbor_session")
     )
     # Include local IPC scheduling while remaining below the simulated slow call.
     app.state.settings.tool_timeout_seconds = 0.25
@@ -449,7 +456,7 @@ async def test_gateway_schema_timeout_and_failure_isolation(environment, monkeyp
 async def test_delegation_dies_with_login_session(environment):
     app, http = environment
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     token = delegate(app.state.settings.session_secret, principal.session_id)
     assert authenticate(app.state.db, app.state.settings, bearer=token).id == principal.id
@@ -466,7 +473,7 @@ async def test_confirmation_is_session_bound_and_single_use(environment, monkeyp
     tool_name = tool_alias("woo", "create_product")
     upstream, tool = app.state.gateway.lookup(tool_name)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     with app.state.db.session() as session:
         confirmation = Confirmation(
@@ -515,7 +522,7 @@ async def test_schema_references_never_fetch_network_or_files(environment, monke
     app, http = environment
     upstream_id = seed_upstream(app)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     retrievals, called = [], []
 
@@ -652,7 +659,7 @@ async def test_credentials_redacted_from_catalog_and_escaped_results(
     assert server["tools"][0]["description"].endswith("[REDACTED]")
     assert server["tools"][0]["inputSchema"]["description"] == "[REDACTED]"
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     result = await app.state.gateway.execute(principal, tool_alias("woo", "list_orders"), {})
     assert not result.is_error
@@ -835,7 +842,7 @@ async def test_changed_confirmation_target_cannot_execute(environment, monkeypat
     name = tool_alias("woo", "create_product")
     upstream, tool = app.state.gateway.lookup(name)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     with app.state.db.session() as session:
         pending = Confirmation(
@@ -869,7 +876,7 @@ async def test_changed_confirmation_target_cannot_execute(environment, monkeypat
 async def test_gateway_audits_oversized_unknown_tool_identifiers(environment):
     app, http = environment
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     result = await app.state.gateway.execute(principal, "unknown" * 100, {}, "request" * 100)
     assert result.is_error
@@ -879,7 +886,10 @@ async def test_gateway_audits_oversized_unknown_tool_identifiers(environment):
         assert len(row.tool_name) == 150 and len(row.request_id) == 100
 
 
-async def test_mcp_enforces_approval_target_and_gateway_read_hints(environment, monkeypatch):
+@pytest.mark.parametrize("header_prefix", ["X-Harbor", "X-Commerce"])
+async def test_mcp_enforces_approval_target_and_gateway_read_hints(
+    environment, monkeypatch, header_prefix
+):
     app, http = environment
     upstream_id = seed_upstream(app)
     with app.state.db.session() as session:
@@ -903,9 +913,10 @@ async def test_mcp_enforces_approval_target_and_gateway_read_hints(environment, 
         yield UpstreamClient(), None
 
     monkeypatch.setattr(app.state.gateway, "connect", connect)
+    other_prefix = "X-Commerce" if header_prefix == "X-Harbor" else "X-Harbor"
     async with httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=app),
-        headers={"Authorization": f"Bearer {key}", "X-Commerce-Target": "outdated"},
+        headers={"Authorization": f"Bearer {key}", f"{header_prefix}-Target": "outdated"},
     ) as mcp_http:
         async with Client(
             streamable_http_client("http://testserver/mcp", http_client=mcp_http), cache=None
@@ -916,15 +927,24 @@ async def test_mcp_enforces_approval_target_and_gateway_read_hints(environment, 
             assert hints[name] is False
             assert (await client.call_tool(name, {"name": "Reviewed"})).is_error
             assert called == []
-            mcp_http.headers["X-Commerce-Target"] = reviewed_target
-            mcp_http.headers["X-Commerce-Read-Only"] = "true"
+            mcp_http.headers[f"{header_prefix}-Target"] = reviewed_target
+            mcp_http.headers[f"{header_prefix}-Read-Only"] = "true"
+            mcp_http.headers[f"{other_prefix}-Read-Only"] = "false"
             assert (await client.call_tool(name, {"name": "Reviewed"})).is_error
             assert called == []
-            del mcp_http.headers["X-Commerce-Read-Only"]
+            del mcp_http.headers[f"{header_prefix}-Read-Only"]
+            del mcp_http.headers[f"{other_prefix}-Read-Only"]
+            mcp_http.headers[f"{other_prefix}-Target"] = "conflicting"
+            conflict = await client.call_tool(name, {"name": "Reviewed"})
+            assert conflict.is_error
+            assert "Conflicting approval target headers" in conflict.content[0].text
+            assert called == []
+            mcp_http.headers[f"{other_prefix}-Target"] = reviewed_target
             assert not (await client.call_tool(name, {"name": "Reviewed"})).is_error
     assert called == ["create_product"]
     outcomes = (await http.get("/api/audit")).json()["items"]
     assert {row["outcome"] for row in outcomes} == {"denied", "success"}
+    assert any(row["error"] == "Conflicting approval target headers" for row in outcomes)
 
 
 @pytest.mark.parametrize("change", ["revoke", "endpoint"])
@@ -934,7 +954,7 @@ async def test_tool_does_not_dispatch_after_access_changes_during_handshake(
     app, http = environment
     upstream_id = seed_upstream(app)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
 
     class UpstreamClient:
@@ -967,7 +987,7 @@ async def test_chat_gateway_errors_are_safe_for_confirmation_paths(
 
     app, http = environment
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
 
     def transport(*args, **kwargs):
@@ -990,7 +1010,7 @@ async def test_edit_server_only_resets_permissions_when_endpoint_changes(
     member, _ = await member_client(app, http)
     async with use_client(member):
         principal = authenticate(
-            app.state.db, app.state.settings, cookie=member.cookies.get("commerce_session")
+            app.state.db, app.state.settings, cookie=member.cookies.get("harbor_session")
         )
         with app.state.db.session() as session:
             original_tools = session.get(Upstream, server_id).tools
@@ -1002,14 +1022,14 @@ async def test_edit_server_only_resets_permissions_when_endpoint_changes(
 
         monkeypatch.setattr(app.state.gateway, "refresh", refresh)
         response = await http.patch(
-            f"/api/servers/{server_id}", json={"name": "Renamed commerce", "url": url}
+            f"/api/servers/{server_id}", json={"name": "Renamed Harbor", "url": url}
         )
         assert response.status_code == 200
         assert refreshed == [server_id]
         endpoint_changed = url == "http://policies:8001/mcp"
         with app.state.db.session() as session:
             server = session.get(Upstream, server_id)
-            assert server.name == "Renamed commerce"
+            assert server.name == "Renamed Harbor"
             assert server.url == (url or "http://woo:8001/mcp")
             assert server.tools == ([] if endpoint_changed else original_tools)
             assert server.permissions == ({} if endpoint_changed else {"list_orders": "read"})
@@ -1544,7 +1564,7 @@ async def test_real_network_transport_and_upstream_sdk(environment):
             assert upstream.status == "Connected", upstream.last_error
             assert {tool["name"] for tool in upstream.tools} == {"get_policy", "search"}
         principal = authenticate(
-            app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+            app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
         )
         result = await app.state.gateway.execute(
             principal, tool_alias("policies", "get_policy"), {"topic": "shipping"}

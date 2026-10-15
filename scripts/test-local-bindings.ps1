@@ -1,7 +1,10 @@
 # Command doubles only. Never contacts Docker or Kubernetes.
 . "$PSScriptRoot/common.ps1"
+$script:ClusterName = 'harbor'
+$script:KubeContext = 'k3d-harbor'
+$script:Namespace = 'harbor'
 . "$PSScriptRoot/local-bindings.ps1"
-$testRoot = Join-Path ([IO.Path]::GetTempPath()) "commerce-bindings-$([guid]::NewGuid())"
+$testRoot = Join-Path ([IO.Path]::GetTempPath()) "harbor-bindings-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 $script:RuntimeRoot = $testRoot
 
@@ -17,13 +20,13 @@ function Test-LocalApi { return $true }
 function Invoke-Native {
     param([string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
     if ($Command -eq 'kubectl') {
-        if (($Arguments -join '|') -ne 'config|set-cluster|k3d-urumi-commerce|--server=https://127.0.0.1:49700') {
+        if (($Arguments -join '|') -ne 'config|set-cluster|k3d-harbor|--server=https://127.0.0.1:49700') {
             throw 'Unexpected kubeconfig change'
         }
         $script:ConfigUpdates++
         return
     }
-    if ($Command -ne $script:K3d -or ($Arguments[0..2] -join '|') -ne 'node|edit|k3d-urumi-commerce-serverlb') {
+    if ($Command -ne $script:K3d -or ($Arguments[0..2] -join '|') -ne 'node|edit|k3d-harbor-serverlb') {
         throw 'Only the project load balancer may be replaced'
     }
     $script:Edits++

@@ -19,7 +19,7 @@ from playwright.async_api import async_playwright, expect
 from tests.acceptance import Acceptance, unpack
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = "http://console.localhost:8080"
+BASE = "http://harbor.localhost:8080"
 STORE = "http://store.localhost:8080"
 OUT = ROOT / ".runtime/browser"
 
@@ -35,7 +35,7 @@ async def login(page, email, password):
 
 
 async def chat(page, prompt):
-    await page.get_by_label("Message the commerce assistant").fill(prompt)
+    await page.get_by_label("Message the Harbor assistant").fill(prompt)
     async with page.expect_response(
         lambda r: r.url.endswith("/api/chat") and r.request.method == "POST", timeout=150000
     ) as received:

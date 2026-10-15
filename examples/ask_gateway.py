@@ -39,7 +39,7 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
         async with httpx2.AsyncClient(
             headers={
                 "Authorization": f"Bearer {gateway_key}",
-                "X-Commerce-Read-Only": "true",
+                "X-Harbor-Read-Only": "true",
             },
             timeout=20,
             trust_env=False,
@@ -159,7 +159,7 @@ def main():
         result = asyncio.run(
             ask(
                 args.prompt,
-                os.environ.get("GATEWAY_URL", "http://console.localhost:8080/mcp"),
+                os.environ.get("GATEWAY_URL", "http://harbor.localhost:8080/mcp"),
                 os.environ.get("GATEWAY_API_KEY", ""),
                 os.environ.get("GEMINI_API_KEY", ""),
                 args.model,

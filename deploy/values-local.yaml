@@ -1,9 +1,9 @@
 imagePullPolicy: IfNotPresent
 ingress:
-  consoleHost: console.localhost
+  consoleHost: harbor.localhost
   storeHost: store.localhost
 urls:
-  console: http://console.localhost:8080
+  console: http://harbor.localhost:8080
   store: http://store.localhost:8080
 gateway:
   secureCookies: false

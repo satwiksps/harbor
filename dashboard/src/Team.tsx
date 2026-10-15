@@ -465,7 +465,7 @@ export function Team({
                 value={JSON.stringify(
                   {
                     mcpServers: {
-                      commerce: {
+                      harbor: {
                         type: "http",
                         url: health?.gateway_url || `${location.origin}/mcp`,
                         headers: { Authorization: "Bearer YOUR_API_KEY" },
@@ -481,7 +481,7 @@ export function Team({
               {JSON.stringify(
                 {
                   mcpServers: {
-                    commerce: {
+                    harbor: {
                       type: "http",
                       url: health?.gateway_url || `${location.origin}/mcp`,
                       headers: { Authorization: "Bearer YOUR_API_KEY" },

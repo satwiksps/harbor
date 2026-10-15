@@ -1,7 +1,10 @@
 # Isolated command-double regression. This script never contacts Docker or Kubernetes.
 . "$PSScriptRoot/common.ps1"
+$script:ClusterName = 'harbor'
+$script:KubeContext = 'k3d-harbor'
+$script:Namespace = 'harbor'
 function kubectl {
-    if ($args -notcontains '--context' -or $args -notcontains 'k3d-urumi-commerce') { throw 'Unexpected Kubernetes context' }
+    if ($args -notcontains '--context' -or $args -notcontains 'k3d-harbor') { throw 'Unexpected Kubernetes context' }
     if ($script:CheckingInstallation) {
         $global:LASTEXITCODE = $script:CheckExitCode
         return $script:ExistingResources
@@ -12,10 +15,10 @@ function kubectl {
 $script:CheckingInstallation = $false
 function docker {
     if ($args[0] -eq 'exec') {
-        if ($args[1] -ne 'k3d-urumi-commerce-server-0') { throw 'Unexpected node target' }
+        if ($args[1] -ne 'k3d-harbor-server-0') { throw 'Unexpected node target' }
         $global:LASTEXITCODE = if ($script:NodeReady) { 0 } else { 1 }
     } elseif ($args[0] -eq 'restart') {
-        if ($args.Count -ne 2 -or $args[1] -ne 'k3d-urumi-commerce-serverlb') { throw 'Unexpected restart target' }
+        if ($args.Count -ne 2 -or $args[1] -ne 'k3d-harbor-serverlb') { throw 'Unexpected restart target' }
         $script:Restarts++
         $script:HostReady = $script:ProxyRecovers
         $global:LASTEXITCODE = if ($script:RestartSucceeds) { 0 } else { 1 }

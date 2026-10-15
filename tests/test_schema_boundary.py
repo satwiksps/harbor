@@ -172,7 +172,7 @@ async def test_gateway_stays_responsive_and_isolates_hostile_schema(environment,
             }
         ]
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     dispatched = []
 

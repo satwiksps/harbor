@@ -1,4 +1,4 @@
-# Commerce console
+# Harbor
 
 A team MCP gateway for a WooCommerce store. Administrators connect tools once; members use one endpoint or the dashboard chat with their own identity and permissions.
 

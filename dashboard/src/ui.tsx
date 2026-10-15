@@ -334,15 +334,13 @@ export function Logo({ small = false }: { small?: boolean }) {
       >
         <rect width="40" height="40" rx="12" fill="currentColor" />
         <path
-          d="M12 12h9a8 8 0 0 1 0 16h-9m0-8h16"
+          d="M13 12v16m14-16v16M13 20h14"
           stroke="#f3f2ed"
           strokeWidth="2.5"
           strokeLinecap="round"
         />
       </svg>
-      <span>
-        Commerce<span className="brand-sub">console</span>
-      </span>
+      <span>Harbor</span>
     </span>
   );
 }

@@ -5,7 +5,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $name }}-data
   labels:
-    {{- include "commerce.labels" $ | nindent 4 }}
+    {{- include "harbor.labels" $ | nindent 4 }}
   {{- if $.Values.storage.retain }}
   annotations:
     helm.sh/resource-policy: keep

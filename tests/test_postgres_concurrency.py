@@ -110,7 +110,7 @@ async def competing_posts(app, path, body, cookie=None, headers=None):
                 transport=httpx2.ASGITransport(app=app),
                 base_url="http://testserver",
                 headers=headers,
-                cookies={"commerce_session": cookie} if cookie else None,
+                cookies={"harbor_session": cookie} if cookie else None,
             ) as client:
                 result = await client.post(path, json=body)
                 identity = None

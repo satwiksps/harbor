@@ -1,1 +1,1 @@
-"""Commerce Console backend."""
+"""Harbor backend."""

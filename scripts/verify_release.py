@@ -5,8 +5,18 @@ import subprocess
 import time
 from pathlib import Path
 
+from local_settings import (
+    CONTEXT,
+    NAMESPACE,
+    POSTGRES_DATABASE,
+    POSTGRES_USER,
+    RELEASE,
+)
+from local_settings import (
+    KUBE as BASE,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ["kubectl", "--context", "k3d-urumi-commerce", "-n", "commerce"]
 HELM = str(ROOT / ".tools" / "helm.exe")
 REPORT = ROOT / ".runtime" / "release-verification.json"
 
@@ -28,9 +38,9 @@ def helm(*arguments):
             HELM,
             *arguments,
             "--kube-context",
-            "k3d-urumi-commerce",
+            CONTEXT,
             "-n",
-            "commerce",
+            NAMESPACE,
         ],
         timeout=900,
     )
@@ -45,9 +55,9 @@ def snapshot():
         "--",
         "psql",
         "-U",
-        "commerce",
+        POSTGRES_USER,
         "-d",
-        "commerce",
+        POSTGRES_DATABASE,
         "-Atc",
         "SELECT id FROM users ORDER BY id;",
     )
@@ -88,7 +98,7 @@ def assert_same_data(before, after):
 
 
 def main():
-    current = json.loads(helm("status", "commerce", "-o", "json"))
+    current = json.loads(helm("status", RELEASE, "-o", "json"))
     assert current["info"]["status"] == "deployed", "Start with a healthy deployed release"
     baseline_revision = current["version"]
     deployment = json.loads(kube("get", "deployment/gateway", "-o", "json"))
@@ -119,7 +129,7 @@ def main():
         changed = True
         helm(
             "upgrade",
-            "commerce",
+            RELEASE,
             str(ROOT / "deploy/chart"),
             "--reuse-values",
             "--set-string",
@@ -135,10 +145,10 @@ def main():
             == test_cpu
         )
         assert_same_data(before, snapshot())
-        report["upgrade_revision"] = json.loads(helm("status", "commerce", "-o", "json"))["version"]
+        report["upgrade_revision"] = json.loads(helm("status", RELEASE, "-o", "json"))["version"]
     finally:
         if changed:
-            helm("rollback", "commerce", str(baseline_revision), "--wait", "--timeout", "15m")
+            helm("rollback", RELEASE, str(baseline_revision), "--wait", "--timeout", "15m")
     restored = json.loads(kube("get", "deployment/gateway", "-o", "json"))
     assert (
         restored["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["cpu"]
@@ -149,7 +159,7 @@ def main():
     report.update(
         {
             "after_rollback": after_rollback,
-            "final_revision": json.loads(helm("status", "commerce", "-o", "json"))["version"],
+            "final_revision": json.loads(helm("status", RELEASE, "-o", "json"))["version"],
             "restored_gateway_cpu_limit": baseline_cpu,
             "scope": "Configuration rollback with unchanged image tags; not a database or old-binary restore",
             "verified_at_unix": int(time.time()),

@@ -8,7 +8,7 @@ This 10 to 12 minute walkthrough covers the running system and its security boun
 - Sign in as the administrator in the first browser and the demo member in a separate browser profile. Generate the external-client key before recording, and keep the key dialog and private files out of frame.
 - Configure the MCP client using the member's URL and key. Test that all seven read tools appear, including the two distinct `search` tools.
 - Choose a unique product name and SKU for this recording. Have a fictional Indian checkout address ready. Set browser zoom to 100 percent.
-- Open Connections, Activity, storefront, WordPress Orders, and a terminal with namespace `commerce`. Keep passwords, Secrets and unredacted client configuration closed.
+- Open Connections, Activity, storefront, WordPress Orders, and a terminal with namespace `harbor`. Keep passwords, Secrets and unredacted client configuration closed.
 - Before running cluster commands, inspect the current context with `kubectl config get-contexts` and `kubectl config current-context`. Select the context created by bootstrap with `kubectl config use-context CONTEXT_NAME`, replacing `CONTEXT_NAME` with that actual context. See [context selection](operations.md#select-the-local-context) for the local procedure.
 
 ## Show, then explain
@@ -17,16 +17,16 @@ This 10 to 12 minute walkthrough covers the running system and its security boun
 2. **Admin chat and checkout, three minutes.** Ask chat to create your unique product at a specific price. Expand the proposed write arguments, approve, and show the successful tool result. Open its storefront page, add it to the cart and complete COD checkout. Show the order in WordPress admin. Ask chat for today's orders and point to this order and its tool call.
 3. **Member and two upstreams, two minutes.** Switch to the member's external client. Show the tool names and that create/update tools are absent. Ask today's orders. Run the shipping-policy-plus-quote prompt from the [user guide](user-guide.md#connect-an-external-client). Show both upstream tool results. Explain that the external client has only a gateway URL and one personal key.
 4. **Control and isolation, two minutes.** Disable Shipping in Connections, refresh external discovery and show its tools disappear. Read the returns policy successfully. Re-enable Shipping. Revoke the member's key and show that the next request is rejected. Show Activity with both users and success/denied outcomes.
-5. **Failure and Kubernetes, two minutes.** Hold one upstream down with `kubectl -n commerce scale deployment/policies-mcp --replicas=0`, then wait for the dashboard to show Unreachable. Call a commerce or shipping tool successfully. Restore with `--replicas=1`. Scaling to zero holds the failure long enough to observe it; Kubernetes normally replaces a killed pod quickly. Also show a pod deletion and its replacement. Show pods, PVCs, Ingress and the RBAC/NetworkPolicy manifests, without displaying Secret data.
+5. **Failure and Kubernetes, two minutes.** Hold one upstream down with `kubectl -n harbor scale deployment/policies-mcp --replicas=0`, then wait for the dashboard to show Unreachable. Call a commerce or shipping tool successfully. Restore with `--replicas=1`. Scaling to zero holds the failure long enough to observe it; Kubernetes normally replaces a killed pod quickly. Also show a pod deletion and its replacement. Show pods, PVCs, Ingress and the RBAC/NetworkPolicy manifests, without displaying Secret data.
 6. **Production and tradeoffs, one minute.** Compare local and production values. Explain DNS, TLS, images, storage and cluster Secret encryption. Describe backup before upgrade and why Helm rollback does not restore database contents. State which capabilities are demonstrated and which limitations remain.
 
-Useful terminal commands:
+These commands use the fresh-install namespace and release `harbor`. For a retained installation, use its [recorded resource names](operations.md#preserve-an-existing-installation).
 
 ```powershell
-kubectl -n commerce get pods,svc,ingress,pvc
-kubectl -n commerce get networkpolicy
-kubectl -n commerce get role,rolebinding
-.tools/helm.exe history commerce -n commerce
+kubectl -n harbor get pods,svc,ingress,pvc
+kubectl -n harbor get networkpolicy
+kubectl -n harbor get role,rolebinding
+.tools/helm.exe history harbor -n harbor
 ```
 
 Do not run `kubectl get secret -o yaml` during a recording. Do not show `.secrets`, raw request headers, or generated key dialogs.

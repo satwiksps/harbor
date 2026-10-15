@@ -17,17 +17,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip \
     && sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
     && sed -i 's/:80>/:8080>/' /etc/apache2/sites-available/000-default.conf \
     && printf '\nServerName localhost\n' >> /etc/apache2/apache2.conf \
-    && mkdir -p /usr/src/wordpress/wp-content/mu-plugins /var/run/apache2 /var/lock/apache2 /opt/commerce \
+    && mkdir -p /usr/src/wordpress/wp-content/mu-plugins /var/run/apache2 /var/lock/apache2 /opt/harbor \
     && chown -R www-data:www-data /var/run/apache2 /var/lock/apache2 /usr/src/wordpress
 COPY --from=cli /usr/local/bin/wp /usr/local/bin/wp
-COPY --chown=33:33 bootstrap.sh seed.php database-ready.php /opt/commerce/
+COPY --chown=33:33 bootstrap.sh seed.php migrate-brand.php sync-packaged.sh database-ready.php /opt/harbor/
 COPY --chown=33:33 health.php /usr/src/wordpress/health.php
-COPY --chown=33:33 commerce-theme.php /usr/src/wordpress/wp-content/mu-plugins/commerce-theme.php
-COPY --chown=33:33 assets/ /usr/src/wordpress/wp-content/commerce-assets/
-RUN chmod 755 /opt/commerce/bootstrap.sh \
-    && php -l /opt/commerce/seed.php \
-    && php -l /opt/commerce/database-ready.php \
+COPY --chown=33:33 harbor-theme.php /usr/src/wordpress/wp-content/mu-plugins/harbor-theme.php
+COPY --chown=33:33 assets/ /usr/src/wordpress/wp-content/harbor-assets/
+RUN chmod 755 /opt/harbor/bootstrap.sh \
+    && php -l /opt/harbor/seed.php \
+    && php -l /opt/harbor/migrate-brand.php \
+    && php -l /opt/harbor/database-ready.php \
     && php -l /usr/src/wordpress/health.php \
-    && php -l /usr/src/wordpress/wp-content/mu-plugins/commerce-theme.php
+    && php -l /usr/src/wordpress/wp-content/mu-plugins/harbor-theme.php
 USER 33:33
 EXPOSE 8080

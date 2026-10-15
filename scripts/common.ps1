@@ -5,9 +5,27 @@ $script:SecretsRoot = Join-Path $script:ProjectRoot '.secrets'
 $script:RuntimeRoot = Join-Path $script:ProjectRoot '.runtime'
 $script:K3d = Join-Path $script:ToolsRoot 'k3d.exe'
 $script:Helm = Join-Path $script:ToolsRoot 'helm.exe'
-$script:ClusterName = 'urumi-commerce'
-$script:KubeContext = 'k3d-urumi-commerce'
-$script:Namespace = 'commerce'
+$script:ClusterName = 'harbor'
+$script:KubeContext = 'k3d-harbor'
+$script:Namespace = 'harbor'
+$script:ReleaseName = 'harbor'
+$script:PostgresUser = 'harbor'
+$script:PostgresDatabase = 'harbor'
+$localSettingsPath = Join-Path $script:RuntimeRoot 'local-settings.json'
+if (Test-Path -LiteralPath $localSettingsPath) {
+    $localSettings = Get-Content -LiteralPath $localSettingsPath -Raw | ConvertFrom-Json -AsHashtable
+    foreach ($setting in $localSettings.Keys) {
+        if ($setting -notin @('clusterName', 'namespace', 'releaseName', 'postgresUser', 'postgresDatabase')) {
+            throw "Unknown local installation setting: $setting"
+        }
+        $value = $localSettings[$setting]
+        if ($value -isnot [string] -or $value -notmatch '^[a-z][a-z0-9-]{0,62}$') {
+            throw "Invalid local installation identifier: $setting"
+        }
+        Set-Variable -Name $setting -Value $value -Scope Script
+    }
+    $script:KubeContext = "k3d-$script:ClusterName"
+}
 function Invoke-Native {
     param([Parameter(Mandatory)][string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
     & $Command @Arguments
@@ -38,7 +56,7 @@ function Repair-LocalApiProxy {
 }
 function Assert-NoExistingInstallation {
     # Lost local credentials must never silently replace passwords for retained data.
-    $existing = & kubectl --context $script:KubeContext --request-timeout=10s -n $script:Namespace get secret/commerce-app-secrets secret/commerce-upstream-credentials pvc/wordpress-data pvc/mariadb-data pvc/postgres-data --ignore-not-found -o name
+    $existing = & kubectl --context $script:KubeContext --request-timeout=10s -n $script:Namespace get secret/harbor-app-secrets secret/harbor-upstream-credentials pvc/wordpress-data pvc/mariadb-data pvc/postgres-data --ignore-not-found -o name
     if ($LASTEXITCODE -ne 0) { throw 'Cannot check for an existing installation. Refusing to generate replacement credentials.' }
     if ($existing) { throw 'Existing project Secrets or volumes were found. Restore .secrets/development.json from your private backup before bootstrapping.' }
 }

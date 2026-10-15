@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: wordpress
   labels:
-    {{- include "commerce.labels" . | nindent 4 }}
+    {{- include "harbor.labels" . | nindent 4 }}
 spec:
   replicas: 1
   strategy: {type: Recreate}
@@ -11,17 +11,17 @@ spec:
     matchLabels: {app: wordpress}
   template:
     metadata:
-      labels: {app: wordpress, app.kubernetes.io/part-of: commerce-console}
-      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+      labels: {app: wordpress, app.kubernetes.io/part-of: harbor}
+      annotations: {harbor.local/revision: {{ .Values.rolloutRevision | quote }}}
     spec:
-      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      {{- include "harbor.pullSecrets" . | nindent 6 }}
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 33, runAsGroup: 33, fsGroup: 33, seccompProfile: {type: RuntimeDefault}}
       initContainers:
         - name: sync-packaged-wordpress
           image: {{ .Values.images.wordpress }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
-          command: [sh, -ec, "cp -r /usr/src/wordpress/. /var/www/html/"]
+          command: [sh, /opt/harbor/sync-packaged.sh]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
           volumeMounts: [{name: wordpress, mountPath: /var/www/html}]
           resources: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
@@ -73,9 +73,9 @@ spec:
   activeDeadlineSeconds: 600
   template:
     metadata:
-      labels: {app: wordpress-bootstrap, app.kubernetes.io/part-of: commerce-console}
+      labels: {app: wordpress-bootstrap, app.kubernetes.io/part-of: harbor}
     spec:
-      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      {{- include "harbor.pullSecrets" . | nindent 6 }}
       restartPolicy: OnFailure
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 33, runAsGroup: 33, fsGroup: 33, seccompProfile: {type: RuntimeDefault}}
@@ -83,7 +83,7 @@ spec:
         - name: bootstrap
           image: {{ .Values.images.wordpress }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
-          command: [sh, /opt/commerce/bootstrap.sh]
+          command: [sh, /opt/harbor/bootstrap.sh]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
           env:
             - {name: WORDPRESS_DB_HOST, value: "mariadb:3306"}

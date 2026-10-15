@@ -24,7 +24,9 @@ def redact(value, sensitive):
     for secret in sensitive:
         if secret:
             encoded = encoded.replace(secret, "[REDACTED]")
-    encoded = re.sub(r"AIza[A-Za-z0-9_-]{20,}|cc_[A-Za-z0-9_-]{30,}", "[REDACTED]", encoded)
+    encoded = re.sub(
+        r"AIza[A-Za-z0-9_-]{20,}|(?:harbor|cc)_[A-Za-z0-9_-]{30,}", "[REDACTED]", encoded
+    )
     return json.loads(encoded.replace(chr(0x2014), "; "))
 
 
@@ -113,7 +115,7 @@ def read_inspector(result):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", default="http://console.localhost:8080")
+    parser.add_argument("--base", default="http://harbor.localhost:8080")
     parser.add_argument("--model", default="gemini-3.1-flash-lite")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--inspector-only", action="store_true")
@@ -175,7 +177,7 @@ def main():
                     json.dumps(
                         {
                             "mcpServers": {
-                                "commerce": {
+                                "harbor": {
                                     "type": "http",
                                     "url": report["gateway"],
                                     "protocolEra": "auto",
@@ -194,7 +196,7 @@ def main():
                     "--config",
                     str(config_path),
                     "--server",
-                    "commerce",
+                    "harbor",
                     "--format",
                     "json",
                     "--quiet",

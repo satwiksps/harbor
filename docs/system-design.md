@@ -1,6 +1,6 @@
 # System design and tradeoffs
 
-Commerce Console is a single-team WooCommerce operations workspace. It demonstrates a complete MCP gateway on Kubernetes with independently failing upstreams.
+Harbor is a single-team WooCommerce operations workspace. It demonstrates a complete MCP gateway on Kubernetes with independently failing upstreams.
 
 ## Components
 
@@ -17,7 +17,7 @@ config:
     lineColor: "#545d56"
 ---
 flowchart TB
-    accTitle: Commerce Console request and storage paths
+    accTitle: Harbor request and storage paths
     accDescr: Dashboard sessions and external API keys reach the FastAPI application and MCP gateway. Chat executes tools through the same gateway. Three upstreams provide commerce, policies and shipping; commerce calls WooCommerce. PostgreSQL, MariaDB and WordPress content use persistent volumes.
     UI[React dashboard] -->|Session cookie + CSRF| API[FastAPI application]
     CLI[External MCP client] -->|Personal bearer key| GW[MCP gateway]

@@ -11,18 +11,18 @@ kind: Deployment
 metadata:
   name: gateway
   labels:
-    {{- include "commerce.labels" . | nindent 4 }}
+    {{- include "harbor.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.gateway.replicas }}
   selector:
     matchLabels: {app: gateway}
   template:
     metadata:
-      labels: {app: gateway, app.kubernetes.io/part-of: commerce-console}
-      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+      labels: {app: gateway, app.kubernetes.io/part-of: harbor}
+      annotations: {harbor.local/revision: {{ .Values.rolloutRevision | quote }}}
     spec:
-      {{- include "commerce.pullSecrets" . | nindent 6 }}
-      serviceAccountName: commerce-gateway
+      {{- include "harbor.pullSecrets" . | nindent 6 }}
+      serviceAccountName: harbor-gateway
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: gateway
@@ -75,17 +75,17 @@ kind: Deployment
 metadata:
   name: dashboard
   labels:
-    {{- include "commerce.labels" . | nindent 4 }}
+    {{- include "harbor.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels: {app: dashboard}
   template:
     metadata:
-      labels: {app: dashboard, app.kubernetes.io/part-of: commerce-console}
-      annotations: {commerce.urumi.dev/revision: {{ .Values.rolloutRevision | quote }}}
+      labels: {app: dashboard, app.kubernetes.io/part-of: harbor}
+      annotations: {harbor.local/revision: {{ .Values.rolloutRevision | quote }}}
     spec:
-      {{- include "commerce.pullSecrets" . | nindent 6 }}
+      {{- include "harbor.pullSecrets" . | nindent 6 }}
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, seccompProfile: {type: RuntimeDefault}}
       containers:

@@ -2,7 +2,7 @@
 
 The documentation lives alongside the application in the private main repository. MkDocs and the Material theme turn `docs/` into a static website. `mkdocs.yml` defines navigation, styling, search and link validation. Documentation changes can be reviewed in the same commit as the behavior they describe.
 
-Cloudflare Pages builds the [documentation website](https://commerce-console-docs.pages.dev/) from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
+Cloudflare Pages builds the [documentation website](https://harbor-handbook.pages.dev/) from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
 
 ## Preview locally
 
@@ -61,7 +61,7 @@ Configure the Pages project with these values:
 | Build output directory | `.runtime/docs-site` |
 | `PYTHON_VERSION` | `3.12` |
 | `SKIP_DEPENDENCY_INSTALL` | `1` |
-| `DOCS_SITE_URL` | `https://commerce-console-docs.pages.dev/` |
+| `DOCS_SITE_URL` | `https://harbor-handbook.pages.dev/` |
 
 The custom build command installs only the locked documentation dependencies. `SKIP_DEPENDENCY_INSTALL` prevents automatic installation of the application's dependency set. See Cloudflare's [build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [dependency installation setting](https://developers.cloudflare.com/pages/configuration/build-image/#skip-dependency-install).
 

@@ -3,10 +3,14 @@
 if (!class_exists('WooCommerce')) { throw new RuntimeException('WooCommerce is unavailable'); }
 WC_Install::create_tables();
 WC_Install::create_pages();
+require_once '/opt/harbor/migrate-brand.php';
+harbor_migrate_brand();
 update_option('blogdescription', 'Useful things. Thoughtfully made.');
 update_option('woocommerce_currency', 'INR');
 update_option('woocommerce_default_country', 'IN:KA');
-update_option('woocommerce_store_address', 'Urumi Supply, Indiranagar');
+if (!get_option('woocommerce_store_address')) {
+    update_option('woocommerce_store_address', 'Harbor Supply, Indiranagar');
+}
 update_option('woocommerce_store_city', 'Bengaluru');
 update_option('woocommerce_store_postcode', '560038');
 update_option('woocommerce_calc_taxes', 'no');
@@ -32,13 +36,13 @@ update_option('show_on_front', 'page');
 update_option('page_on_front', (int)get_option('woocommerce_shop_page_id'));
 // Classic shortcodes keep the storefront flow reliable without a payment extension.
 // Subsequent deployments must preserve pages edited by the store administrator.
-if (!get_option('commerce_seed_complete')) {
+if (!get_option('harbor_seed_complete')) {
     foreach (['cart' => '[woocommerce_cart]', 'checkout' => '[woocommerce_checkout]'] as $page => $content) {
         wp_update_post(['ID' => (int)get_option('woocommerce_' . $page . '_page_id'), 'post_content' => $content]);
     }
 }
 // Publish a working demo notice once. Future administrator edits remain intact.
-if (!get_option('commerce_demo_privacy_page_id')) {
+if (!get_option('harbor_demo_privacy_page_id')) {
     $privacy = get_post((int)get_option('wp_page_for_privacy_policy'));
     if (!$privacy || $privacy->post_type !== 'page' || $privacy->post_status !== 'publish') {
         $privacy_id = wp_insert_post([
@@ -46,7 +50,7 @@ if (!get_option('commerce_demo_privacy_page_id')) {
             'post_title' => 'Demo data use', 'post_name' => 'demo-data-use',
             'post_content' => '<h2>A local demonstration store</h2>'
                 . '<p>Use invented names, addresses, and contact details when trying this store. Do not enter real personal or payment information.</p>'
-                . '<p>Checkout details and test orders are saved in the store database. The store administrator can view them in WooCommerce, and authorized Commerce console users can query order details through the connected tools.</p>'
+                . '<p>Checkout details and test orders are saved in the store database. The store administrator can view them in WooCommerce, and authorized Harbor users can query order details through the connected tools.</p>'
                 . '<p>Cash-on-delivery orders here are demonstrations. No payment is collected and no goods are delivered.</p>'
                 . '<p>The person running this demonstration controls its stored records and local backups. Ask that person to remove any test records you no longer want retained.</p>',
         ], true);
@@ -56,7 +60,7 @@ if (!get_option('commerce_demo_privacy_page_id')) {
     } else {
         $privacy_id = $privacy->ID;
     }
-    update_option('commerce_demo_privacy_page_id', $privacy_id);
+    update_option('harbor_demo_privacy_page_id', $privacy_id);
 }
 $zone = new WC_Shipping_Zone(0);
 $has_free = false;
@@ -87,19 +91,19 @@ $hash = wc_api_hash($key);
 $existing = $wpdb->get_var($wpdb->prepare("SELECT key_id FROM $table WHERE consumer_key = %s", $hash));
 if (!$existing) {
     $wpdb->insert($table, [
-        'user_id' => $user->ID, 'description' => 'Commerce gateway', 'permissions' => 'read_write',
+        'user_id' => $user->ID, 'description' => 'Harbor gateway', 'permissions' => 'read_write',
         'consumer_key' => $hash, 'consumer_secret' => $secret, 'truncated_key' => substr($key, -7),
     ]);
     if ($wpdb->last_error) { throw new RuntimeException('Could not create the gateway REST credential'); }
 }
 $items = [
-    ['URUMI-TOTE-01', 'Everyday canvas tote', '799.00', 'An uncomplicated carryall for work, errands, and everything between. Natural canvas, roomy interior, reinforced handles.'],
-    ['URUMI-BOTTLE-01', 'Daily steel bottle', '1199.00', 'A durable companion for your desk and your next journey. Reusable stainless steel, 750 ml, easy-grip finish.'],
-    ['URUMI-NOTEBOOK-01', 'Notes for tomorrow', '349.00', 'A simple place for a new idea. A5 dotted pages, lay-flat binding, and a soft cover in warm stone.'],
+    ['HARBOR-TOTE-01', 'Everyday canvas tote', '799.00', 'An uncomplicated carryall for work, errands, and everything between. Natural canvas, roomy interior, reinforced handles.'],
+    ['HARBOR-BOTTLE-01', 'Daily steel bottle', '1199.00', 'A durable companion for your desk and your next journey. Reusable stainless steel, 750 ml, easy-grip finish.'],
+    ['HARBOR-NOTEBOOK-01', 'Notes for tomorrow', '349.00', 'A simple place for a new idea. A5 dotted pages, lay-flat binding, and a soft cover in warm stone.'],
 ];
 foreach ($items as [$sku, $name, $price, $description]) {
     // A deleted starter item stays deleted after the initial seeding has completed.
-    if (get_option('commerce_seed_complete') || wc_get_product_id_by_sku($sku)) { continue; }
+    if (get_option('harbor_seed_complete') || wc_get_product_id_by_sku($sku)) { continue; }
     $product = new WC_Product_Simple();
     $product->set_name($name);
     $product->set_sku($sku);
@@ -114,13 +118,13 @@ foreach ($items as [$sku, $name, $price, $description]) {
     $product->save();
 }
 // Replace default sample content only during initial seeding.
-if (!get_option('commerce_seed_complete')) {
+if (!get_option('harbor_seed_complete')) {
     foreach (['hello-world', 'sample-page'] as $slug) {
         $post = get_page_by_path($slug, OBJECT, ['post', 'page']);
         if ($post) { wp_trash_post($post->ID); }
     }
     update_option('sidebars_widgets', ['wp_inactive_widgets' => [], 'array_version' => 3]);
-    update_option('commerce_seed_complete', '1');
+    update_option('harbor_seed_complete', '1');
 }
 flush_rewrite_rules(true);
 echo "Store bootstrap complete; existing catalog and page edits were preserved.\n";

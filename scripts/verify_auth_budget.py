@@ -1,6 +1,6 @@
 """Exercise ten real concurrent password checks in a disposable 512 MiB gateway.
 
-Build commerce-console:dev first. This creates only synthetic local data, uses
+Build harbor:dev first. This creates only synthetic local data, uses
 an already built image, and removes its own container even when a check fails.
 """
 
@@ -23,9 +23,9 @@ def docker(*arguments):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--image", default="commerce-console:dev")
+    parser.add_argument("--image", default="harbor:dev")
     args = parser.parse_args()
-    name = "commerce-auth-budget-" + secrets.token_hex(4)
+    name = "harbor-auth-budget-" + secrets.token_hex(4)
     created = False
     try:
         docker(

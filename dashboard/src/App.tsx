@@ -26,7 +26,7 @@ import { Team } from "./Team";
 import { AuditPage } from "./Audit";
 
 type Page = "chat" | "connections" | "team" | "audit";
-const sessionChangeKey = "commerce-console:session-change";
+const sessionChangeKey = "harbor:session-change";
 function announceSessionChange() {
   try {
     localStorage.setItem(sessionChangeKey, crypto.randomUUID());
@@ -288,9 +288,9 @@ function Workspace({
           </button>
         </div>
         <div className="workspace-label">
-          <span className="workspace-avatar">C</span>
+          <span className="workspace-avatar">H</span>
           <div>
-            <strong>Commerce workspace</strong>
+            <strong>Harbor workspace</strong>
             <span>Team environment</span>
           </div>
           <Layers3 size={16} />
@@ -490,7 +490,7 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="auth-footnote">
-          Independent engineering project <span>Commerce console</span>
+          Independent engineering project <span>Harbor</span>
         </div>
       </div>
       <div className="auth-form-side">
@@ -546,7 +546,7 @@ function Login({
         <p className="muted">
           {switchingAccount
             ? "Sign in with the account you want to use in this browser. Other open workspace tabs will use this account too."
-            : "Sign in to your commerce workspace."}
+            : "Sign in to your Harbor workspace."}
         </p>
         {(error || initialError) && (
           <ErrorBox message={error || initialError} />

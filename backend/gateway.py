@@ -49,7 +49,7 @@ class Gateway:
         self.refresh_locks = {}
         self.schema_checks = SchemaBoundary()
         self.server = Server(
-            "commerce-console",
+            "harbor",
             version="0.1.0",
             on_list_tools=self.list_handler,
             on_call_tool=self.call_handler,
@@ -135,7 +135,7 @@ class Gateway:
         return None, None
 
     async def list_handler(self, ctx, params):
-        principal = ctx.request.scope["commerce.principal"]
+        principal = ctx.request.scope["harbor.principal"]
         tools = self.list_for(principal)
         try:
             offset = int(params.cursor or "0") if params else 0
@@ -151,17 +151,34 @@ class Gateway:
         )
 
     async def call_handler(self, ctx, params):
+        headers = ctx.request.headers
+        target = headers.get("x-harbor-target")
+        legacy_target = headers.get("x-commerce-target")
         return await self.execute(
-            ctx.request.scope["commerce.principal"],
+            ctx.request.scope["harbor.principal"],
             params.name,
             params.arguments or {},
             str(ctx.request_id or uid()),
-            expected_target=ctx.request.headers.get("x-commerce-target"),
-            require_read=ctx.request.headers.get("x-commerce-read-only") == "true",
+            expected_target=target if target is not None else legacy_target,
+            target_conflict=(
+                target is not None and legacy_target is not None and target != legacy_target
+            ),
+            # Older clients must retain their requested safety restriction.
+            require_read=(
+                headers.get("x-harbor-read-only") == "true"
+                or headers.get("x-commerce-read-only") == "true"
+            ),
         )
 
     async def execute(
-        self, principal, name, arguments, request_id=None, expected_target=None, require_read=False
+        self,
+        principal,
+        name,
+        arguments,
+        request_id=None,
+        expected_target=None,
+        require_read=False,
+        target_conflict=False,
     ):
         started = time.monotonic()
         upstream, tool = self.lookup(name)
@@ -189,6 +206,9 @@ class Gateway:
             return message
 
         try:
+            if target_conflict:
+                outcome, error = "denied", "Conflicting approval target headers"
+                return tool_error(error)
             if (
                 not upstream
                 or not upstream.enabled

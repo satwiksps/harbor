@@ -67,14 +67,16 @@ jobs:
           tar -xzf helm-v4.3.1-linux-amd64.tar.gz
       - run: ./linux-amd64/helm lint deploy/chart -f deploy/values-local.yaml
       - run: ./linux-amd64/helm lint deploy/chart -f deploy/values-prod.yaml
-      - run: ./linux-amd64/helm template commerce deploy/chart -f deploy/values-prod.yaml > /tmp/commerce-rendered.yaml
+      - run: ./linux-amd64/helm template harbor deploy/chart -f deploy/values-prod.yaml > /tmp/harbor-rendered.yaml
   images:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - run: docker build -t commerce-console:ci .
+      - run: docker build -t harbor:ci .
       - name: Verify authentication memory budget
-        run: python scripts/verify_auth_budget.py --image commerce-console:ci
-      - run: docker build -t commerce-dashboard:ci -f dashboard/Dockerfile .
-      - run: docker build -t commerce-wordpress:ci docker/wordpress
+        run: python scripts/verify_auth_budget.py --image harbor:ci
+      - run: docker build -t harbor-dashboard:ci -f dashboard/Dockerfile .
+      - run: docker build -t harbor-wordpress:ci docker/wordpress
+      - name: Verify storefront branding migration preserves data
+        run: docker run --rm --network none --entrypoint php -v "$PWD:/workspace:ro" harbor-wordpress:ci /workspace/scripts/test-wordpress-brand.php

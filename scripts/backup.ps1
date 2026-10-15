@@ -28,7 +28,7 @@ function Save-ExecOutput {
     Move-Item -LiteralPath $partialFile -Destination $File
 }
 # The database stores credential references; the current mutable Secret must travel with it.
-$secretJson = & kubectl --context $KubeContext --request-timeout=15s -n $Namespace get secret commerce-app-secrets commerce-upstream-credentials -o json
+$secretJson = & kubectl --context $KubeContext --request-timeout=15s -n $Namespace get secret harbor-app-secrets harbor-upstream-credentials -o json
 if ($LASTEXITCODE -ne 0) { throw 'Cannot back up the project Secrets.' }
 $secretSnapshot = $secretJson | ConvertFrom-Json -AsHashtable
 foreach ($item in $secretSnapshot.items) {
@@ -40,7 +40,10 @@ foreach ($filename in @('development.json', 'gemini-api-key.txt')) {
         Copy-Item -LiteralPath (Join-Path $SecretsRoot $filename) -Destination (Join-Path $backupRoot $filename)
     }
 }
-Save-ExecOutput -File (Join-Path $backupRoot 'gateway.dump') -ExecArguments @('deployment/postgres', '--', 'pg_dump', '-U', 'commerce', '-d', 'commerce', '-Fc')
+if (Test-Path -LiteralPath $localSettingsPath) {
+    Copy-Item -LiteralPath $localSettingsPath -Destination (Join-Path $backupRoot 'local-settings.json')
+}
+Save-ExecOutput -File (Join-Path $backupRoot 'gateway.dump') -ExecArguments @('deployment/postgres', '--', 'pg_dump', '-U', $PostgresUser, '-d', $PostgresDatabase, '-Fc')
 Save-ExecOutput -File (Join-Path $backupRoot 'wordpress.sql') -ExecArguments @('deployment/mariadb', '--', 'sh', '-c', 'mariadb-dump --single-transaction --user=wordpress --password="$MARIADB_PASSWORD" wordpress')
 Save-ExecOutput -File (Join-Path $backupRoot 'wordpress-content.tar.gz') -ExecArguments @('deployment/wordpress', '--', 'tar', '-czf', '-', '-C', '/var/www/html', 'wp-content', 'wp-config.php')
 Write-Host "Database, WordPress content and current credential snapshots written privately to $backupRoot"

@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import httpx2
+from local_settings import KUBE
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
@@ -18,7 +19,7 @@ from tests.acceptance import Acceptance, unpack  # noqa: E402
 
 def kube(*args):
     result = subprocess.run(
-        ["kubectl", "--context", "k3d-urumi-commerce", "-n", "commerce", *args],
+        [*KUBE, *args],
         capture_output=True,
         text=True,
         timeout=180,
@@ -30,7 +31,7 @@ def kube(*args):
 
 async def main():
     credentials = json.loads((ROOT / ".secrets/development.json").read_text(encoding="utf-8-sig"))
-    base = "http://console.localhost:8080"
+    base = "http://harbor.localhost:8080"
     admin, _ = await Acceptance(base).login(
         credentials["admin_email"], credentials["admin_password"]
     )

@@ -71,7 +71,7 @@ Tool permissions are `read` or `write`. New tools default to administrator-only.
 | `GET /api/invites` | Lists `{id, email, role, expires_at, accepted_at}` | Administrator |
 | `POST /api/invites` | `{email, role}` returns invitation details and `invite_url` | Administrator |
 
-Key records contain `id`, `name`, `prefix`, `user_id`, `created_at`, `last_used_at` and `revoked_at`. Only creation returns the full key. The final active administrator cannot be demoted or deactivated. Invitation links must be copied and shared privately; there is no email provider.
+Key records contain `id`, `name`, `prefix`, `user_id`, `created_at`, `last_used_at` and `revoked_at`. Only creation returns the full key. Newly issued keys use the `harbor_` prefix; existing `cc_` keys remain valid until revoked. The final active administrator cannot be demoted or deactivated. Invitation links must be copied and shared privately; there is no email provider.
 
 ## Activity and chat
 
@@ -112,6 +112,8 @@ Send `POST /api/chat/confirm` with `{id, approve}` to approve or cancel a propos
 
 Each upstream serves MCP at `/mcp`. `UPSTREAM_KIND` selects `woo`, `policies` or `shipping`, and `UPSTREAM_TOKEN` is required. Commerce also needs `WOO_URL`, `WOO_KEY` and `WOO_SECRET`.
 
+Tool-call guards use `X-Harbor-Read-Only` and `X-Harbor-Target`. For existing clients, `X-Commerce-Read-Only` remains accepted: either read-only header set to `true` restricts writes. `X-Commerce-Target` is used only when the Harbor target header is absent; conflicting supplied targets are denied and audited. New clients emit only the Harbor headers.
+
 The Helm deployment adds trusted proxy handling to the gateway command. `FORWARDED_ALLOW_IPS` comes from the chart's narrowly configured ingress proxy CIDRs. Do not trust arbitrary forwarding headers; see [operations](operations.md).
 
 ## Gateway configuration
@@ -134,8 +136,8 @@ Configuration is read from environment variables. The chart provides deployed va
 | `ALLOWED_INTERNAL_HOSTS` | Comma-separated exact service DNS names trusted as internal upstreams |
 | `SECRET_BACKEND` | `kubernetes` for deployment; `file` for local development only |
 | `SECRET_FILE` | Local file-mode path, default `.secrets/upstreams.json` |
-| `UPSTREAM_CREDENTIAL_SECRET` | Mutable credential Secret, default `commerce-upstream-credentials` |
-| `POD_NAMESPACE` | Kubernetes namespace, default `commerce` |
+| `UPSTREAM_CREDENTIAL_SECRET` | Mutable credential Secret, default `harbor-upstream-credentials` |
+| `POD_NAMESPACE` | Kubernetes namespace, default `harbor` |
 | `BOOTSTRAP_SERVERS_JSON` | Initial connections and their reviewed read tools |
 | `TOOL_TIMEOUT_SECONDS` | Upstream call deadline, default 15 seconds |
 | `DISCOVERY_TIMEOUT_SECONDS` | Discovery deadline, default 8 seconds |
@@ -147,8 +149,8 @@ Configuration is read from environment variables. The chart provides deployed va
 
 ## Deployment contract
 
-The local ingress serves `http://console.localhost:8080` and `http://store.localhost:8080`. The MCP endpoint uses `/mcp` on the console host. Host port bindings are restricted to loopback.
+The local ingress serves `http://harbor.localhost:8080` and `http://store.localhost:8080`. The MCP endpoint uses `/mcp` on the console host. Host port bindings are restricted to loopback.
 
-Local images are `commerce-console:dev` for the backend and upstreams, `commerce-dashboard:dev` for the frontend, and `commerce-wordpress:dev` for the store. Services are ClusterIP. Only dashboard, gateway and store traffic passes through ingress. The chart includes resource requests/limits, health probes, persistent volumes and NetworkPolicies.
+Local images are `harbor:dev` for the backend and upstreams, `harbor-dashboard:dev` for the frontend, and `harbor-wordpress:dev` for the store. Services are ClusterIP. Only dashboard, gateway and store traffic passes through ingress. The chart includes resource requests/limits, health probes, persistent volumes and NetworkPolicies.
 
 Scripts generate credentials; source and Helm values contain no deployed secrets. Use the [operations guide](operations.md) for complete installation, production configuration, backup and recovery instructions.

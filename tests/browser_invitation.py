@@ -14,7 +14,7 @@ import httpx
 from playwright.async_api import async_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = "http://console.localhost:8080"
+BASE = "http://harbor.localhost:8080"
 STAGE = "setup"
 
 
@@ -94,7 +94,7 @@ async def main():
                     await expect(
                         chat.locator(".topbar").get_by_text("Admin access", exact=True)
                     ).to_be_visible()
-                    await chat.get_by_label("Message the commerce assistant").fill(
+                    await chat.get_by_label("Message the Harbor assistant").fill(
                         "Private admin draft"
                     )
                     team = await context.new_page()
@@ -138,7 +138,7 @@ async def main():
                         await expect(
                             page.get_by_role("link", name="Team & keys", exact=True)
                         ).to_have_count(0)
-                    await expect(chat.get_by_label("Message the commerce assistant")).to_have_value(
+                    await expect(chat.get_by_label("Message the Harbor assistant")).to_have_value(
                         ""
                     )
                     await expect(

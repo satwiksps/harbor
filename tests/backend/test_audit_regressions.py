@@ -102,7 +102,7 @@ async def test_post_dispatch_failures_preserve_write_uncertainty(
     app, http = environment
     seed_upstream(app)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
     name = tool_alias("woo", "create_product" if write else "list_orders")
     dispatched = []
@@ -153,7 +153,7 @@ async def test_failed_handshake_does_not_claim_write_was_dispatched(environment,
     app, http = environment
     seed_upstream(app)
     principal = authenticate(
-        app.state.db, app.state.settings, cookie=http.cookies.get("commerce_session")
+        app.state.db, app.state.settings, cookie=http.cookies.get("harbor_session")
     )
 
     @asynccontextmanager

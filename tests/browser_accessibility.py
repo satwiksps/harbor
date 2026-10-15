@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 from playwright.async_api import async_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("COMMERCE_CONSOLE_URL", "http://127.0.0.1:4173").rstrip("/")
+BASE = os.getenv("HARBOR_URL", "http://127.0.0.1:4173").rstrip("/")
 OUT = ROOT / ".runtime" / "accessibility"
 WIDTHS = [320, 390, 430, 768, 1440]
 
@@ -123,7 +123,7 @@ async def main():
                 await expect(store).to_be_visible()
                 await expect(store).to_have_attribute("href", "http://store.example.test")
                 report["checks"].append({"width": width, "accessible_name": "Open store"})
-                composer = page.get_by_label("Message the commerce assistant", exact=True)
+                composer = page.get_by_label("Message the Harbor assistant", exact=True)
                 await check_contrast(page, ".composer textarea", width, "::placeholder")
                 await composer.fill("Prepare the fixture product.")
                 await page.get_by_role("button", name="Send message", exact=True).click()

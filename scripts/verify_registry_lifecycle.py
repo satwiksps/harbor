@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+from local_settings import KUBE
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tests.acceptance import Acceptance  # noqa: E402
@@ -28,7 +30,7 @@ async def read_servers(admin):
 
 def kube(*arguments):
     result = subprocess.run(
-        ["kubectl", "--context", "k3d-urumi-commerce", "-n", "commerce", *arguments],
+        [*KUBE, *arguments],
         capture_output=True,
         text=True,
         timeout=240,
@@ -40,7 +42,7 @@ def kube(*arguments):
 
 async def main():
     credentials = json.loads((ROOT / ".secrets/development.json").read_text(encoding="utf-8-sig"))
-    admin, _ = await Acceptance("http://console.localhost:8080").login(
+    admin, _ = await Acceptance("http://harbor.localhost:8080").login(
         credentials["admin_email"], credentials["admin_password"]
     )
     original = None
@@ -72,7 +74,7 @@ async def main():
             if entry["name"] == "UPSTREAM_TOKEN"
         )
         assert token["valueFrom"]["secretKeyRef"] == {
-            "name": "commerce-app-secrets",
+            "name": "harbor-app-secrets",
             "key": "upstream_shipping",
         }
         report["service_token_uses_separate_application_secret"] = True

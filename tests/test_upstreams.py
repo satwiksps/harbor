@@ -112,7 +112,7 @@ async def test_wc_signed_request_pagination_and_error_redaction():
         "http://wordpress",
         "ck_test",
         "test-secret",
-        "http://store.urumi.test:8080",
+        "http://store.harbor.test:8080",
         transport=httpx.MockTransport(handler),
     )
     result = await wc.list_products(page=2, per_page=10)

@@ -48,7 +48,7 @@ class GatewayOnly:
 def build_server(kind: str, woo: WooCommerce | None = None) -> MCPServer:
     if kind not in {"woo", "policies", "shipping"}:
         raise ValueError("UPSTREAM_KIND must be woo, policies, or shipping")
-    server = MCPServer(f"Commerce {kind}", version="0.1.0")
+    server = MCPServer(f"Harbor {kind}", version="0.1.0")
     if kind == "woo":
         store = woo or WooCommerce(
             os.getenv("WOO_URL", "http://wordpress"),

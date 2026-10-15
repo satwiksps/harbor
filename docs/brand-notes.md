@@ -1,6 +1,6 @@
 # Visual design and asset provenance
 
-Commerce Console uses a quiet sidebar, generous whitespace, compact operational tables, restrained color, and a chat workspace with live connection context. The application mark and layout are original to this project.
+Harbor uses a quiet sidebar, generous whitespace, compact operational tables, restrained color, and a chat workspace with live connection context. The application mark and layout are original to this project.
 
 ## Design tokens
 

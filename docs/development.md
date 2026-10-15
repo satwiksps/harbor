@@ -72,9 +72,9 @@ The acceptance harness calls all three upstreams over MCP and checks hidden writ
 For accessibility checks with browser-local API fixtures:
 
 ```powershell
-$env:COMMERCE_CONSOLE_URL = 'http://console.localhost:8080'
+$env:HARBOR_URL = 'http://harbor.localhost:8080'
 uv run python -m tests.browser_accessibility
-Remove-Item Env:COMMERCE_CONSOLE_URL
+Remove-Item Env:HARBOR_URL
 ```
 
 This harness can also target a running frontend preview. It does not send application mutations or provider requests.

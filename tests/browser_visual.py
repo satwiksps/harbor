@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("COMMERCE_CONSOLE_URL", "http://console.localhost:8080").rstrip("/")
+BASE = os.getenv("HARBOR_URL", "http://harbor.localhost:8080").rstrip("/")
 STORE = "http://store.localhost:8080"
 OUT = ROOT / ".runtime" / "visual-audit"
 STAGE = "setup"

@@ -52,7 +52,7 @@ from backend.security import (
     random_token,
 )
 
-COOKIE = "commerce_session"
+COOKIE = "harbor_session"
 logger = logging.getLogger(__name__)
 
 
@@ -159,7 +159,7 @@ class BoundaryMiddleware:
             try:
                 principal = authenticate(self.db, self.settings, bearer=bearer)
                 self.limiter.check("mcp:" + principal.id, 120)
-                scope["commerce.principal"] = principal
+                scope["harbor.principal"] = principal
             except HTTPException as exc:
                 # Revoked keys can still be attributed, but they never authorize execution.
                 if bearer and not bearer.startswith("chat.") and request.method == "POST":
@@ -266,7 +266,7 @@ def create_app(settings: Settings | None = None):
         db.engine.dispose()
 
     app = FastAPI(
-        title="Commerce Console API",
+        title="Harbor API",
         version="0.1.0",
         lifespan=lifespan,
         docs_url="/api/docs",
@@ -513,7 +513,7 @@ def create_app(settings: Settings | None = None):
             user = session.get(User, user_id)
             if not user or not user.active:
                 raise HTTPException(404, "Active member not found")
-            token = "cc_" + random_token()
+            token = "harbor_" + random_token()
             key = ApiKey(
                 user_id=user_id, name=body.name.strip(), prefix=token[:12], token_hash=digest(token)
             )

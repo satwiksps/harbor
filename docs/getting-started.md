@@ -1,6 +1,6 @@
 # Getting started
 
-Run the complete console and storefront on a local Windows machine. Commands below run in PowerShell 7 from the repository root.
+Run Harbor and its storefront on a local Windows machine. Commands below run in PowerShell 7 from the repository root.
 
 ## Prerequisites
 
@@ -39,6 +39,8 @@ You can skip the key to use management and MCP without chat. Chat reports that t
 
 ## Start the system
 
+For a retained installation that uses earlier resource names, first follow [the upgrade preservation steps](operations.md#preserve-an-existing-installation). Fresh installations use the Harbor defaults.
+
 ```powershell
 pwsh -File scripts/bootstrap.ps1
 ```
@@ -56,10 +58,10 @@ Rerunning bootstrap preserves existing store and gateway data. It does not repla
 
 | Service | Local address |
 | --- | --- |
-| Console | [console.localhost:8080](http://console.localhost:8080) |
+| Harbor | [harbor.localhost:8080](http://harbor.localhost:8080) |
 | Storefront | [store.localhost:8080](http://store.localhost:8080) |
 | WordPress administration | [store.localhost:8080/wp-admin/](http://store.localhost:8080/wp-admin/) |
-| MCP endpoint | `http://console.localhost:8080/mcp` |
+| MCP endpoint | `http://harbor.localhost:8080/mcp` |
 
 The `.localhost` names resolve to loopback. No Windows hosts-file change is needed. These addresses refer to the machine running the cluster, not a hosted demonstration.
 

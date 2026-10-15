@@ -5,7 +5,9 @@ import secrets
 import subprocess
 from pathlib import Path
 
-BASE = ["kubectl", "--context", "k3d-urumi-commerce", "-n", "commerce"]
+from local_settings import KUBE as BASE
+from local_settings import NAMESPACE
+
 PYTHON = "/app/.venv/bin/python"
 
 
@@ -70,7 +72,7 @@ def main():
             stdin=socket_probe([("wordpress", 80, True), ("mariadb", 3306, False)]),
         ).stdout
     )
-    kube("exec", "deployment/wordpress", "--", "php", "/opt/commerce/database-ready.php")
+    kube("exec", "deployment/wordpress", "--", "php", "/opt/harbor/database-ready.php")
     reports["wordpress_database_health"] = "passed"
     reports["policy_service_denials"] = json.loads(
         kube(
@@ -90,7 +92,7 @@ def main():
             ),
         ).stdout
     )
-    pod_name = "commerce-boundary-" + secrets.token_hex(4)
+    pod_name = "harbor-boundary-" + secrets.token_hex(4)
     deployment = json.loads(kube("get", "deployment/gateway", "-o", "json").stdout)
     image = deployment["spec"]["template"]["spec"]["containers"][0]["image"]
     pod = {
@@ -138,10 +140,10 @@ def main():
         kube("delete", "pod", pod_name, "--ignore-not-found", "--wait=false", ok=False)
     reports["rbac"] = []
     for verb, resource, expected in [
-        ("get", "secret/commerce-upstream-credentials", "yes"),
-        ("patch", "secret/commerce-upstream-credentials", "yes"),
-        ("update", "secret/commerce-upstream-credentials", "no"),
-        ("get", "secret/commerce-app-secrets", "no"),
+        ("get", "secret/harbor-upstream-credentials", "yes"),
+        ("patch", "secret/harbor-upstream-credentials", "yes"),
+        ("update", "secret/harbor-upstream-credentials", "no"),
+        ("get", "secret/harbor-app-secrets", "no"),
         ("list", "secrets", "no"),
         ("create", "deployments", "no"),
     ]:
@@ -150,7 +152,7 @@ def main():
             "can-i",
             verb,
             resource,
-            "--as=system:serviceaccount:commerce:commerce-gateway",
+            f"--as=system:serviceaccount:{NAMESPACE}:harbor-gateway",
             ok=False,
         ).stdout.strip()
         assert actual == expected, (verb, resource, actual)

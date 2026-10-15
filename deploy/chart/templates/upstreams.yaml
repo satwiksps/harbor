@@ -5,17 +5,17 @@ kind: Deployment
 metadata:
   name: {{ $kind }}-mcp
   labels:
-    {{- include "commerce.labels" $ | nindent 4 }}
+    {{- include "harbor.labels" $ | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels: {app: {{ $kind }}-mcp}
   template:
     metadata:
-      labels: {app: {{ $kind }}-mcp, component: upstream, app.kubernetes.io/part-of: commerce-console}
-      annotations: {commerce.urumi.dev/revision: {{ $.Values.rolloutRevision | quote }}}
+      labels: {app: {{ $kind }}-mcp, component: upstream, app.kubernetes.io/part-of: harbor}
+      annotations: {harbor.local/revision: {{ $.Values.rolloutRevision | quote }}}
     spec:
-      {{- include "commerce.pullSecrets" $ | nindent 6 }}
+      {{- include "harbor.pullSecrets" $ | nindent 6 }}
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:

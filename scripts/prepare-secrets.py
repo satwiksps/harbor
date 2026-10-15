@@ -7,12 +7,16 @@ import os
 import secrets
 from pathlib import Path
 
+from local_settings import NAMESPACE, POSTGRES_DATABASE, POSTGRES_USER
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--namespace", default="commerce")
+    parser.add_argument("--namespace", default=NAMESPACE)
+    parser.add_argument("--postgres-user", default=POSTGRES_USER)
+    parser.add_argument("--postgres-database", default=POSTGRES_DATABASE)
     parser.add_argument("--output-dir", type=Path, default=Path(".secrets"))
-    parser.add_argument("--admin-email", default="admin@urumi.local")
+    parser.add_argument("--admin-email", default="admin@harbor.local")
     parser.add_argument("--wordpress-admin-user", default="storeadmin")
     parser.add_argument("--prompt-gemini", action="store_true")
     args = parser.parse_args()
@@ -70,15 +74,18 @@ def main():
     )
     app_data = {key: credentials[key] for key in app_keys}
     app_data["database_url"] = (
-        "postgresql+psycopg://commerce:"
+        "postgresql+psycopg://"
+        + args.postgres_user
+        + ":"
         + credentials["postgres_password"]
-        + "@postgres:5432/commerce"
+        + "@postgres:5432/"
+        + args.postgres_database
     )
     app_data["gemini_api_key"] = gemini_file.read_text().strip() if gemini_file.exists() else ""
     documents = {
-        "k8s-app-secret.json": ("commerce-app-secrets", app_data),
+        "k8s-app-secret.json": ("harbor-app-secrets", app_data),
         "k8s-upstream-secret.json": (
-            "commerce-upstream-credentials",
+            "harbor-upstream-credentials",
             {key: credentials["upstream_" + key] for key in ("woo", "policies", "shipping")},
         ),
     }

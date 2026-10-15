@@ -1,8 +1,8 @@
 # Build and push versioned images, then replace these names with your registry.
 images:
-  app: ghcr.io/REPLACE_OWNER/commerce-console:0.1.0
-  dashboard: ghcr.io/REPLACE_OWNER/commerce-dashboard:0.1.0
-  wordpress: ghcr.io/REPLACE_OWNER/commerce-wordpress:0.1.0
+  app: ghcr.io/REPLACE_OWNER/harbor:0.1.0
+  dashboard: ghcr.io/REPLACE_OWNER/harbor-dashboard:0.1.0
+  wordpress: ghcr.io/REPLACE_OWNER/harbor-wordpress:0.1.0
 imagePullPolicy: IfNotPresent
 ingress:
   className: traefik
@@ -10,7 +10,7 @@ ingress:
   storeHost: store.example.com
   # Create a TLS secret out of band or configure cert-manager separately.
   tls:
-    - secretName: commerce-ingress-tls
+    - secretName: harbor-ingress-tls
       hosts: [console.example.com, store.example.com]
 urls:
   console: https://console.example.com

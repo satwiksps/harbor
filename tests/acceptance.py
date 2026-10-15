@@ -287,7 +287,7 @@ class Acceptance:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default="http://console.localhost:8080")
+    parser.add_argument("--base", default="http://harbor.localhost:8080")
     parser.add_argument("--chat", action="store_true")
     args = parser.parse_args()
     asyncio.run(Acceptance(args.base).run(args.chat))

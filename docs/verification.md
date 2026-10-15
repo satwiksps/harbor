@@ -24,7 +24,7 @@ The nine reported findings and their corrections are mapped in [the audit record
 
 The schema worker has a Linux-only 128 MiB address-space limit; Windows tests deliberately skip that assertion. PostgreSQL tests deliberately skip without `TEST_POSTGRES_URL`. CI supplies a disposable PostgreSQL service and runs on Linux, so all three cases execute there. The image job also runs the real Argon2 budget probe. These are targeted resource regressions, not a sustained load or DDoS test.
 
-For the isolated accessibility harness, set `COMMERCE_CONSOLE_URL` to the running console or frontend preview, then run `uv run python -m tests.browser_accessibility`. All API responses are browser-local fixtures; it sends no provider calls or application mutations. `tests.browser_acceptance --audit-only` now writes `audit-report.json` with scope `activity-only`; it never changes the full-journey `report.json`.
+For the isolated accessibility harness, set `HARBOR_URL` to the running console or frontend preview, then run `uv run python -m tests.browser_accessibility`. All API responses are browser-local fixtures; it sends no provider calls or application mutations. `tests.browser_acceptance --audit-only` now writes `audit-report.json` with scope `activity-only`; it never changes the full-journey `report.json`.
 
 No live Gemini request, new checkout, backup restoration, public TLS/VPS test, or pod-failure drill was repeated during this correction pass. Earlier evidence for those flows remains explicitly separate below. Runtime screenshots and reports remain Git-excluded.
 

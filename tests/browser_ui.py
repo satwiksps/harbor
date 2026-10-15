@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("COMMERCE_CONSOLE_URL", "http://console.localhost:8080").rstrip("/")
+BASE = os.getenv("HARBOR_URL", "http://harbor.localhost:8080").rstrip("/")
 STAGE = "setup"
 
 
@@ -39,7 +39,7 @@ async def main():
             await page.get_by_label("Password", exact=True).fill(credentials["admin_password"])
             await page.get_by_role("button", name="Sign in", exact=True).click()
             await page.locator(".main-shell").wait_for(timeout=45000)
-            composer = page.get_by_label("Message the commerce assistant", exact=True)
+            composer = page.get_by_label("Message the Harbor assistant", exact=True)
             payloads = []
             mode = "failure"
 

@@ -1,8 +1,8 @@
-nameOverride: commerce
+nameOverride: harbor
 images:
-  app: commerce-console:dev
-  dashboard: commerce-dashboard:dev
-  wordpress: commerce-wordpress:dev
+  app: harbor:dev
+  dashboard: harbor-dashboard:dev
+  wordpress: harbor-wordpress:dev
   mariadb: mariadb:11.4.13
   postgres: postgres:17.11
 imagePullPolicy: IfNotPresent
@@ -10,16 +10,16 @@ imagePullSecrets: []
 rolloutRevision: initial
 ingress:
   className: traefik
-  consoleHost: console.localhost
+  consoleHost: harbor.localhost
   storeHost: store.localhost
   annotations: {}
   tls: []
 urls:
-  console: http://console.localhost:8080
+  console: http://harbor.localhost:8080
   store: http://store.localhost:8080
 secrets:
-  application: commerce-app-secrets
-  upstreamCredentials: commerce-upstream-credentials
+  application: harbor-app-secrets
+  upstreamCredentials: harbor-upstream-credentials
 storage:
   className: local-path
   wordpress: 2Gi
@@ -29,7 +29,7 @@ storage:
 gateway:
   replicas: 1
   geminiModel: gemini-3.1-flash-lite
-  adminEmail: admin@urumi.local
+  adminEmail: admin@harbor.local
   adminName: Satwik
   secureCookies: false
   # Single-node k3s pod range. NetworkPolicy also restricts callers to Traefik.
@@ -44,8 +44,8 @@ dashboard:
     limits: {cpu: 250m, memory: 128Mi}
 wordpress:
   adminUser: storeadmin
-  adminEmail: storeadmin@urumi.local
-  title: Urumi Supply
+  adminEmail: storeadmin@harbor.local
+  title: Harbor Supply
   resources:
     requests: {cpu: 200m, memory: 256Mi}
     limits: {cpu: "1", memory: 768Mi}
@@ -54,6 +54,8 @@ mariadb:
     requests: {cpu: 100m, memory: 192Mi}
     limits: {cpu: 750m, memory: 512Mi}
 postgres:
+  user: harbor
+  database: harbor
   resources:
     requests: {cpu: 100m, memory: 128Mi}
     limits: {cpu: 500m, memory: 384Mi}

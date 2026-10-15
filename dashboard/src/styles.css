@@ -399,14 +399,6 @@ code {
 .brand > span {
   color: var(--ink);
 }
-.brand-sub {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.7px;
-  font-weight: 400;
-  margin-top: 5px;
-}
 .brand-small .brand-mark {
   width: 30px;
   height: 30px;
