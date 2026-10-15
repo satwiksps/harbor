@@ -397,6 +397,7 @@ function Workspace({
             {health.data?.store_url && (
               <a
                 className="button secondary small"
+                aria-label="Open store"
                 href={health.data.store_url}
                 target="_blank"
                 rel="noreferrer"

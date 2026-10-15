@@ -99,11 +99,14 @@ async def verify_order_tools(credentials, order_id):
 async def main(audit_only=False):
     OUT.mkdir(parents=True, exist_ok=True)
     credentials = json.loads((ROOT / ".secrets/development.json").read_text("utf-8-sig"))
-    report = (
-        json.loads((OUT / "report.json").read_text("utf-8"))
-        if audit_only
-        else {"timestamp": time.time(), "checks": []}
-    )
+    # A narrower Activity check must never certify an interrupted full journey.
+    report_path = OUT / ("audit-report.json" if audit_only else "report.json")
+    report = {
+        "timestamp": time.time(),
+        "scope": "activity-only" if audit_only else "full-journey",
+        "checks": [],
+        "complete": False,
+    }
 
     def record(name):
         report["checks"].append(name)
@@ -130,7 +133,6 @@ async def main(audit_only=False):
                 record("Tool activity visible in browser")
                 assert not errors, errors
                 record("No dashboard JavaScript exceptions on audit verification")
-                report["audit_verification_timestamp"] = time.time()
                 report["complete"] = True
                 return
             record("Browser administrator login")
@@ -232,14 +234,18 @@ async def main(audit_only=False):
             await page.screenshot(path=str(OUT / "failure.png"), full_page=True)
             raise
         finally:
-            (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
             await context.close()
             await browser.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--audit-only", action="store_true", help="Resume final audit verification")
+    parser.add_argument(
+        "--audit-only",
+        action="store_true",
+        help="Verify Activity visibility separately from the full journey",
+    )
     args = parser.parse_args()
     try:
         asyncio.run(main(args.audit_only))

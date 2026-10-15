@@ -1962,7 +1962,7 @@ select {
   list-style: none;
   padding: 10px 12px;
   cursor: pointer;
-  color: #80976a;
+  color: #5b704b;
 }
 .tool-call summary::-webkit-details-marker {
   display: none;
@@ -2019,7 +2019,7 @@ select {
   background: #f0f5e7;
   padding: 20px;
   margin-bottom: 25px;
-  color: #60784d;
+  color: #596f46;
 }
 .confirmation-title {
   display: flex;
@@ -2782,7 +2782,7 @@ select {
   font-size: 11px;
 }
 .composer textarea::placeholder {
-  color: #748367;
+  color: #65765a;
 }
 .composer-note {
   font-size: 11px;
@@ -2828,7 +2828,7 @@ th {
 }
 input::placeholder,
 textarea::placeholder {
-  color: #77836b;
+  color: #69775f;
 }
 body:has(dialog[open]),
 body:has(.sidebar.is-open) {
