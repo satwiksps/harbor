@@ -8,6 +8,21 @@ jobs:
   application:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --memory=256m --memory-swap=256m
+          --health-cmd="pg_isready -U test -d test"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://test:test@127.0.0.1:5432/test
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
@@ -48,5 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: docker build -t commerce-console:ci .
+      - name: Verify authentication memory budget
+        run: python scripts/verify_auth_budget.py --image commerce-console:ci
       - run: docker build -t commerce-dashboard:ci -f dashboard/Dockerfile .
       - run: docker build -t commerce-wordpress:ci docker/wordpress

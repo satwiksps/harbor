@@ -20,6 +20,24 @@ Audit date: 15 October 2026. Scope: application logic, authorization, chat, MCP 
 | Repeatability and recovery | Bootstrap checks retained state before generating credentials, recovers a stale project load balancer with a bounded check, and preserves store edits after initial seeding. Backups include current mutable credential references and local recovery files, with private permissions and atomic dump completion. |
 | Logging and dependencies | Dashboard request logging no longer records invitation query tokens, and responses use a no-referrer policy. OAuthLib was updated to 4.0.0 after the dependency audit. |
 
+## Independent audit follow-up
+
+The subsequent independent report identified nine actionable findings. Each was checked against the implementation before correction. The availability findings were reproduced in isolated tests, including a disposable container for the memory budget. No application data was used for destructive probes.
+
+| Finding | Verified correction | Regression coverage |
+| --- | --- | --- |
+| AUD-001: hostile schemas | Schema checking and validation run in one reusable, terminable subprocess. Each operation has a two-second execution deadline, bounded JSON input, and a Linux worker memory limit. | Hostile regexes, reference expansion, cancellation, worker recovery, concurrent health and a healthy upstream |
+| AUD-002: password memory | Hashing and verification share two non-queueing slots. Overload returns 503 with Retry-After; Argon2 strength is unchanged. The request limiter also synchronizes concurrent handlers. | Ten concurrent HTTP attempts, invitation/hash slot sharing, failure cleanup, disposable 512 MiB container |
+| AUD-003: local publication | New clusters explicitly bind ingress and API ports to loopback. Existing installations have a scoped, resumable load-balancer migration that preserves the server and data volumes. | Seven offline binding scenarios, actual port migration, Windows listeners and non-loopback connection rejection |
+| AUD-004: proxy identity | Uvicorn trusts the ingress node's pod CIDRs only in conjunction with the Traefik NetworkPolicy. Deployment discovers the local range. | Independent login/invitation allowances, successful second-client login, forged headers and forwarded chains |
+| AUD-005: external read-only agent | Every request carries the gateway's read-only guard, including when an administrator key is used accidentally. | Mocked model response after reclassification over the real MCP transport; zero upstream dispatches |
+| AUD-006: uncertain writes | Failures after write dispatch consistently advise reconciliation before retry, including oversize, protocol, serialization, tool error, timeout and cancellation paths. | One-dispatch assertions, audit errors, read-only controls and pre-dispatch failure controls |
+| AUD-007: mobile store link | The link has a persistent accessible name. | Accessible-role queries from 320 to 1440 pixels |
+| AUD-008: text contrast | Four affected foreground treatments were darkened without changing the layout or palette. | Rendered foreground/background contrast at five widths, all above 4.5:1 |
+| AUD-009: evidence integrity | Activity-only verification writes a separate scoped report and never alters the full-journey result. | Partial, complete and missing prior reports, with successful and failed Activity checks |
+
+Additional PostgreSQL tests use separate connections and synchronized competing requests to verify single-use invitation acceptance and confirmation approval. These tests do not substitute for a full live checkout or provider demonstration. CI supplies a disposable PostgreSQL service and runs the authentication container budget check.
+
 ## Validation method
 
 Unit and real MCP protocol tests cover authorization, race conditions, schema validation, response boundaries and store calculations. Deployed acceptance exercises real Kubernetes services and the actual store. Browser regression checks use real sign-in and controlled responses to reproduce network failures and overlapping actions. These fixture checks are reported separately from live Gemini and checkout tests.

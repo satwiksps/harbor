@@ -2,7 +2,33 @@
 
 Validation is performed against the local `k3d-urumi-commerce` cluster, not a public VPS. Run the commands below to reproduce the checks. Live acceptance tests create synthetic store data and consume Gemini quota.
 
-## Automated checks
+## Independent audit corrections, 15 October 2026
+
+The nine reported findings and their corrections are mapped in [the audit record](audit.md#independent-audit-follow-up). The corrected application is deployed as local Helm release 9. A private backup was taken before changing the existing local port bindings. The cluster server and all three persistent volumes were retained.
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` on Windows | 145 passed in 41.00 seconds; three explicit platform/environment skips |
+| Disposable PostgreSQL 17.11 concurrency | Both skipped database cases passed against separate contending connections: one invitation acceptance and one confirmation dispatch |
+| Linux schema memory boundary | A counted-repeat regex that OOM-killed the old disposable 512 MiB container was rejected in 53 ms after the fix; normal validation then succeeded, with zero OOM events and a 123.78 MiB container peak |
+| `uv run python scripts/verify_auth_budget.py` | At the chart's one CPU and 512 MiB budget: ten concurrent requests, two real Argon2 checks, eight 503 responses, 230.97 MiB peak, 78 ms maximum sampled health latency, no OOM kill |
+| Ruff and production frontend build | Passed; no dependency changes were required |
+| Helm and Kubernetes validation | Both profiles linted; local manifests passed server dry-run validation |
+| Offline operational checks | Eight recovery cases, seven port-binding cases and two credential-preparation checks passed |
+| Local socket exposure | Docker and Windows listeners use 127.0.0.1 for 8080, 8443 and the retained API port; connection attempts through both non-loopback host interfaces failed |
+| Deployed `tests.acceptance` | All 13 non-LLM checks passed against release 9 |
+| Deployed `tests.browser_ui` and `tests.browser_invitation` | Nine interaction checks and eight invitation/account-switching checks passed |
+| Deployed `tests.browser_visual` | 51 captures passed at 320 to 1440 pixels, with no document-wide overflow or JavaScript exceptions |
+| Deployed bundle with `tests.browser_accessibility` fixtures | Store link accessible at five widths; all reported normal-text combinations above 4.5:1, including the nested confirmation summary |
+| `scripts/verify_network.py` | Positive controls, blocked peer/untrusted traffic, and named-Secret RBAC passed |
+
+The schema worker has a Linux-only 128 MiB address-space limit; Windows tests deliberately skip that assertion. PostgreSQL tests deliberately skip without `TEST_POSTGRES_URL`. CI supplies a disposable PostgreSQL service and runs on Linux, so all three cases execute there. The image job also runs the real Argon2 budget probe. These are targeted resource regressions, not a sustained load or DDoS test.
+
+For the isolated accessibility harness, set `COMMERCE_CONSOLE_URL` to the running console or frontend preview, then run `uv run python -m tests.browser_accessibility`. All API responses are browser-local fixtures; it sends no provider calls or application mutations. `tests.browser_acceptance --audit-only` now writes `audit-report.json` with scope `activity-only`; it never changes the full-journey `report.json`.
+
+No live Gemini request, new checkout submission, backup restoration, public TLS/VPS test, or pod-failure drill was repeated during this correction pass. Earlier evidence for those flows remains explicitly separate below. Runtime screenshots and reports remain Git-excluded.
+
+## Earlier end-to-end verification
 
 | Check | Command | Evidence |
 | --- | --- | --- |
