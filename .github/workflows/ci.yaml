@@ -15,7 +15,7 @@ jobs:
           version: 0.12.23
       - run: uv venv .runtime/docs-venv --python 3.12
       - run: uv pip sync docs/requirements.txt --require-hashes --python .runtime/docs-venv/bin/python
-      - run: .runtime/docs-venv/bin/python -m mkdocs build --strict
+      - run: .runtime/docs-venv/bin/python scripts/build-docs.py
   application:
     runs-on: ubuntu-latest
     timeout-minutes: 15

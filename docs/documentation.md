@@ -1,6 +1,8 @@
 # Maintaining the documentation
 
-The documentation uses MkDocs with the Material theme. Markdown pages and assets live in `docs/`; `mkdocs.yml` defines navigation, styling, search, and link validation. The documentation build is separate from the application environment and does not need Docker, a running cluster, or credentials.
+The documentation lives alongside the application in the private main repository. MkDocs and the Material theme turn `docs/` into a static website. `mkdocs.yml` defines navigation, styling, search and link validation. Documentation changes can be reviewed in the same commit as the behavior they describe.
+
+Cloudflare Pages builds the site from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
 
 ## Preview locally
 
@@ -17,15 +19,15 @@ Open <http://127.0.0.1:8765>. Edits reload automatically. On macOS or Linux, use
 For a static build:
 
 ```powershell
-.runtime/docs-venv/Scripts/python.exe -m mkdocs build --strict
+.runtime/docs-venv/Scripts/python.exe scripts/build-docs.py
 ```
 
-The output is written to ignored `.runtime/docs-site`. Strict mode treats missing pages, broken relative links, and invalid heading anchors as build failures. CI runs the same documentation build on every push and pull request.
+The helper checks the approved documentation inputs, runs MkDocs in strict mode and checks the output before publication. Missing pages, broken relative links and invalid heading anchors fail the build. Output goes to ignored `.runtime/docs-site`. GitHub Actions runs the same helper on every push and pull request.
 
 ## Add or update a page
 
 1. Edit a Markdown page in `docs/` and link related guides using relative `.md` paths. MkDocs converts those paths to website URLs.
-2. Add new pages to the `nav` section in `mkdocs.yml`.
+2. Add new pages to the `nav` section in `mkdocs.yml` and the approved input list in `scripts/build-docs.py`.
 3. Put diagrams in fenced `mermaid` blocks. Describe the same relationships in the surrounding text so the page remains useful without JavaScript.
 4. Run the strict build, then check the changed page on a desktop and a narrow screen. Check tables, code blocks, search results, and heading links.
 5. Keep outcomes and limitations together. Recorded verification is evidence from a particular run, not a guarantee that every deployment has passed it.
@@ -39,34 +41,43 @@ Use fictional examples. Keep passwords, API keys, invitation tokens, customer in
 ```powershell
 uv pip compile docs/requirements.in --python-version 3.12 --universal --output-file docs/requirements.txt --generate-hashes
 uv pip sync docs/requirements.txt --require-hashes --python .runtime/docs-venv/Scripts/python.exe
-.runtime/docs-venv/Scripts/python.exe -m mkdocs build --strict
+.runtime/docs-venv/Scripts/python.exe scripts/build-docs.py
 ```
 
 The website uses system fonts and the project's original SVG mark. It does not publish the Switzer font binary. Search runs in the browser; the site does not need an application server or analytics service. Mermaid loads its renderer when the architecture page is opened.
 
 ## Hosting and publication
 
-The [documentation website](https://commerce-console-docs.readthedocs.io/en/latest/) is hosted on Read the Docs Community. Its source is the separate [documentation repository](https://github.com/satwiksps/commerce-console-docs). The application repository remains private. The MIT license in the documentation repository covers the documentation and original documentation assets only.
+Use a Cloudflare Pages project connected directly to the private application repository through its [GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/). Limit the GitHub App's repository access to this project. The repository remains private; the generated website is public.
 
-`.readthedocs.yaml` selects Ubuntu 24.04, Python 3.12, the locked requirements, and a strict MkDocs build. `READTHEDOCS_CANONICAL_URL` supplies the canonical URL during hosted builds. The `latest` version follows the documentation repository's `main` branch. GitHub sends signed webhook events to Read the Docs so pushes rebuild the website. GitHub Actions independently checks the strict build.
+Configure the Pages project with these values:
 
-The source pages are maintained alongside the application. From the private application checkout, publish reviewed changes with the export script:
+| Setting | Value |
+| --- | --- |
+| Production branch | `main` |
+| Root directory | Repository root |
+| Build command | `pip install --require-hashes -r docs/requirements.txt && python scripts/build-docs.py` |
+| Build output directory | `.runtime/docs-site` |
+| `PYTHON_VERSION` | `3.12` |
+| `SKIP_DEPENDENCY_INSTALL` | `1` |
+| `DOCS_SITE_URL` | The verified public site URL, including `https://` and a trailing slash |
 
-```powershell
-.runtime/docs-venv/Scripts/python.exe -m mkdocs build --strict
-uv run python scripts/export-docs.py
-git -C .runtime/docs-publication status --short
-git -C .runtime/docs-publication diff
-```
+The custom build command installs only the locked documentation dependencies. `SKIP_DEPENDENCY_INSTALL` prevents automatic installation of the application's dependency set. See Cloudflare's [build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [dependency installation setting](https://developers.cloudflare.com/pages/configuration/build-image/#skip-dependency-install).
 
-The exporter copies an explicit file list into `.runtime/docs-publication` and preserves that checkout's independent Git history. It rejects linked paths, unexpected destination files, and restricted project references. A hash manifest stays beside the export in the private `.runtime` directory. New documentation files must be added to the export list as well as the site navigation.
+Set `DOCS_SITE_URL` after confirming the assigned address in the Pages project. MkDocs uses it for canonical URLs. Local builds can leave it unset. Do not substitute an unverified address or a deployment-specific preview URL for the stable site address.
 
-Review the diff before committing and pushing the documentation checkout's `main` branch. Its remote must be `https://github.com/satwiksps/commerce-console-docs.git`. On a new workstation, first clone that repository into `.runtime/docs-publication`, then run the exporter. Never use the application checkout or its Git history as the public documentation source.
+For [build watch paths](https://developers.cloudflare.com/pages/configuration/build-watch-paths/), include `docs/*`, `mkdocs.yml` and `scripts/build-docs.py`. A single trailing `*` includes nested paths in Pages. These paths cover content, assets, dependency locks and build validation, while ordinary application-only changes can skip a website build. Update the list if a new file outside these paths affects the documentation output.
 
-After a push, check [GitHub Actions](https://github.com/satwiksps/commerce-console-docs/actions) and [Read the Docs builds](https://app.readthedocs.org/projects/commerce-console-docs/builds/), then open the changed page on the website. A successful local build does not confirm that hosting has updated. If a build does not start, inspect the GitHub webhook's recent deliveries and the project's Read the Docs integration activity.
+Publish by reviewing and committing the documentation changes in the application checkout, then pushing or merging to `main`. The Pages Git integration triggers deployment. GitHub Actions checks the build independently; a successful CI run alone does not prove that hosting has updated.
+
+After each publication, check the Pages deployment's commit SHA and successful build status, then open the changed page at the production address. Check navigation, search and a narrow-screen layout. If no build starts, inspect the repository connection, production branch and watch paths in Pages. Keep the README's documentation link pointed at the verified production address.
 
 ## Publication boundaries
 
-The export excludes application source, application Git history, credentials, the operator screenshot, generated pages, and private runtime records. Keep examples fictional and review each change for identifying details before publication.
+Only `.runtime/docs-site` is the Pages output directory. Never point hosting at the repository root, `.runtime` or `docs` itself. MkDocs reads the approved documentation source and excludes the operator screenshot, dependency files and raw theme templates from direct publication. The build helper verifies those exclusions and the site's indexing directives.
 
-Each page requests `noindex, nofollow, noarchive` through its robots meta tag. `robots.txt` permits crawling so search engines can read that request. These directives reduce indexing by cooperating search engines; they do not restrict access to the public website or GitHub repository.
+Keep application source, Git metadata, credentials, raw runtime evidence and identifying details out of the generated site. Files placed under `docs/` can become public assets even when they are not linked from navigation, so review new assets as carefully as page text. No application secrets belong in Pages environment variables.
+
+Each page requests `noindex, nofollow, noarchive` through its robots meta tag. `robots.txt` permits crawling so search engines can read that request. These directives reduce indexing by cooperating search engines; they do not restrict access to the public website. The source repository's privacy is a separate setting.
+
+The [documentation license](LICENSE) applies to the documentation and original documentation assets only. It does not license the application source. Third-party fonts and other assets retain their own [licenses and attribution](brand-notes.md).
