@@ -5,7 +5,9 @@ import json
 import secrets
 import time
 from collections import defaultdict, deque
+from contextlib import contextmanager
 from dataclasses import dataclass
+from threading import BoundedSemaphore, Lock
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -15,6 +17,26 @@ from sqlalchemy import select
 from backend.models import ApiKey, LoginSession, User, now
 
 password_hasher = PasswordHasher()
+# Argon2 uses 64 MiB per operation. Two slots leave headroom within the
+# single gateway's 512 MiB limit; overload must not create an unbounded queue.
+_password_slots = BoundedSemaphore(2)
+
+
+@contextmanager
+def password_slot():
+    if not _password_slots.acquire(blocking=False):
+        raise HTTPException(
+            503, "Sign-in is busy. Please retry shortly.", headers={"Retry-After": "1"}
+        )
+    try:
+        yield
+    finally:
+        _password_slots.release()
+
+
+def hash_password(password: str) -> str:
+    with password_slot():
+        return password_hasher.hash(password)
 
 
 def digest(token: str) -> str:
@@ -26,10 +48,11 @@ def random_token() -> str:
 
 
 def check_password(encoded: str, password: str) -> bool:
-    try:
-        return password_hasher.verify(encoded, password)
-    except (VerificationError, InvalidHashError):
-        return False
+    with password_slot():
+        try:
+            return password_hasher.verify(encoded, password)
+        except (VerificationError, InvalidHashError):
+            return False
 
 
 @dataclass(frozen=True)
@@ -144,8 +167,14 @@ class RateLimiter:
 
     def __init__(self):
         self.buckets = defaultdict(deque)
+        self.lock = Lock()
 
     def check(self, key: str, limit: int, window: int = 60):
+        # FastAPI's synchronous authentication handlers run in different threads.
+        with self.lock:
+            self._check(key, limit, window)
+
+    def _check(self, key: str, limit: int, window: int):
         instant = time.monotonic()
         if len(self.buckets) > 4096:
             self.buckets = defaultdict(

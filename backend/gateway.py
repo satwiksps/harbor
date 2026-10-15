@@ -19,7 +19,7 @@ from sqlalchemy import select
 from backend.models import Audit, Upstream, now, uid
 from backend.network import SafeTransport, validate_url
 from backend.security import refresh_principal
-from backend.tool_safety import redact_credential, schema_validator, target_hash
+from backend.tool_safety import SchemaBoundary, redact_credential, target_hash
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class Gateway:
         self.registry_lock = asyncio.Lock()
         self.call_slots = {}
         self.refresh_locks = {}
+        self.schema_checks = SchemaBoundary()
         self.server = Server(
             "commerce-console",
             version="0.1.0",
@@ -180,6 +181,13 @@ class Gateway:
                 )
             )
         outcome, error = "error", None
+        write_dispatched = False
+
+        def failure(message):
+            if write_dispatched:
+                message += " A write may have completed; verify the store state before retrying."
+            return message
+
         try:
             if (
                 not upstream
@@ -215,7 +223,7 @@ class Gateway:
                         outcome, error = "denied", "This tool requires review and confirmation"
                         return tool_error(error)
                     try:
-                        schema_validator(tool["inputSchema"]).validate(arguments)
+                        await self.schema_checks.validate(tool["inputSchema"], arguments)
                     except (jsonschema.ValidationError, jsonschema.SchemaError, ValueError):
                         outcome, error = "invalid_arguments", "Tool arguments or schema are invalid"
                         return tool_error(error)
@@ -236,32 +244,37 @@ class Gateway:
                                 "Connection or permissions changed before the tool could run",
                             )
                             return tool_error(error)
+                        write_dispatched = current_upstream.permissions.get(tool["name"]) != "read"
                         result = await client.call_tool(tool["name"], arguments)
             encoded = result.model_dump_json(by_alias=True)
             if len(encoded.encode()) > 256 * 1024:
-                error = "Tool result exceeded the 256 KiB gateway limit"
+                error = failure("Tool result exceeded the 256 KiB gateway limit.")
                 return tool_error(error)
             result = types.CallToolResult.model_validate(
                 redact_credential(json.loads(encoded), credential)
             )
             outcome = "tool_error" if result.is_error else "success"
-            error = "Upstream tool returned an error" if result.is_error else None
+            error = failure("Upstream tool returned an error.") if result.is_error else None
+            if result.is_error and write_dispatched:
+                result.content.append(types.TextContent(type="text", text=error))
             return result
         except HTTPException:
-            outcome, error = "denied", "User access changed while the call was waiting"
+            outcome, error = "denied", failure("User access changed while the call was waiting.")
             return tool_error(error)
         except TimeoutError:
             outcome, error = (
                 "timeout",
-                "Upstream deadline exceeded. A write may have completed; verify before retrying.",
+                failure("Upstream deadline exceeded."),
             )
             return tool_error(error)
         except asyncio.CancelledError:
-            outcome, error = "cancelled", "Client disconnected or request was cancelled"
+            outcome, error = "cancelled", failure("Client disconnected or request was cancelled.")
             raise
         except Exception as exc:
             # Exception messages can contain URLs, headers or response data. Do not persist them.
-            error = f"Upstream request failed ({type(exc).__name__}). Check server health and credentials."
+            error = failure(
+                f"Upstream request failed ({type(exc).__name__}). Check server health and credentials."
+            )
             return tool_error(error)
         finally:
             with self.db.session() as session:
@@ -295,9 +308,9 @@ class Gateway:
                                 value = redact_credential(
                                     item.model_dump(by_alias=True, exclude_none=True), credential
                                 )
-                                schema_validator(value["inputSchema"])
+                                await self.schema_checks.check(value["inputSchema"])
                                 if value.get("outputSchema") is not None:
-                                    schema_validator(value["outputSchema"])
+                                    await self.schema_checks.check(value["outputSchema"])
                                 tools.append(value)
                             if not page.next_cursor:
                                 break

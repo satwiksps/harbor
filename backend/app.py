@@ -48,7 +48,7 @@ from backend.security import (
     check_password,
     csrf,
     digest,
-    password_hasher,
+    hash_password,
     random_token,
 )
 
@@ -231,7 +231,7 @@ def create_app(settings: Settings | None = None):
                         email=settings.bootstrap_admin_email.strip().lower(),
                         name=settings.bootstrap_admin_name,
                         role="admin",
-                        password_hash=password_hasher.hash(settings.bootstrap_admin_password),
+                        password_hash=hash_password(settings.bootstrap_admin_password),
                     )
                 )
             if not session.get(BootstrapState, "defaults"):
@@ -262,6 +262,7 @@ def create_app(settings: Settings | None = None):
                     task.cancel()
                     with suppress(asyncio.CancelledError):
                         await task
+                await gateway.schema_checks.close()
         db.engine.dispose()
 
     app = FastAPI(
@@ -418,7 +419,7 @@ def create_app(settings: Settings | None = None):
                 email=invite.email,
                 name=body.name.strip(),
                 role=invite.role,
-                password_hash=password_hasher.hash(body.password),
+                password_hash=hash_password(body.password),
             )
             session.add(user)
             invite.accepted_at = now()

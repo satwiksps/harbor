@@ -37,7 +37,10 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
     calls = []
     async with asyncio.timeout(120):
         async with httpx2.AsyncClient(
-            headers={"Authorization": f"Bearer {gateway_key}"},
+            headers={
+                "Authorization": f"Bearer {gateway_key}",
+                "X-Commerce-Read-Only": "true",
+            },
             timeout=20,
             trust_env=False,
             follow_redirects=False,
@@ -49,7 +52,8 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
             ) as gateway:
                 catalog = await gateway.list_tools()
                 # This read-only example also refuses write tools if an admin key
-                # is supplied accidentally. The gateway still authorizes every call.
+                # is supplied accidentally. The header also enforces this at dispatch
+                # if permissions change while the model is preparing its response.
                 tools = {
                     tool.name: tool
                     for tool in catalog.tools

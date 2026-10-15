@@ -31,10 +31,14 @@ from backend.tool_safety import schema_validator, target_hash
 
 
 @pytest.fixture
-async def environment(tmp_path):
+async def environment(tmp_path, request):
     password = secrets.token_urlsafe(24)
     settings = Settings(
-        database_url="sqlite:///:memory:",
+        database_url=(
+            f"sqlite:///{tmp_path / 'concurrent.db'}"
+            if getattr(request, "param", None) == "file"
+            else "sqlite:///:memory:"
+        ),
         testing=True,
         session_secret=secrets.token_urlsafe(48),
         secret_backend="file",
@@ -398,7 +402,8 @@ async def test_gateway_schema_timeout_and_failure_isolation(environment, monkeyp
     principal = authenticate(
         app.state.db, app.state.settings, cookie=admin_http.cookies.get("commerce_session")
     )
-    app.state.settings.tool_timeout_seconds = 0.03
+    # Include local IPC scheduling while remaining below the simulated slow call.
+    app.state.settings.tool_timeout_seconds = 0.25
 
     class UpstreamClient:
         def __init__(self, slug):
