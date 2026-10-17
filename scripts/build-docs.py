@@ -33,7 +33,6 @@ PUBLIC_DOCS = {
     "stylesheets/extra.css",
     "theme/main.html",
 }
-EXCLUDED_DOCS = {"assets/console.png"}
 BLOCKED_CONTENT = re.compile(
     r"urumi|\b(?:recruit(?:ment|ing|ers?)?|submissions?|internships?|assignments?)\b",
     re.IGNORECASE,
@@ -57,8 +56,6 @@ def validate_sources() -> None:
             if not path.is_file():
                 continue
             relative = path.relative_to(docs).as_posix()
-            if relative in EXCLUDED_DOCS:
-                continue
             if relative not in PUBLIC_DOCS:
                 raise ValueError(f"Documentation publication review required: docs/{relative}")
             if BLOCKED_CONTENT.search(path.read_text(encoding="utf-8")):

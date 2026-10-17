@@ -71,7 +71,6 @@ validation:
 exclude_docs: |
   requirements.in
   requirements.txt
-  assets/console.png
   theme/
 
 extra_css:
