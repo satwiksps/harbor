@@ -44,7 +44,11 @@ export function Team({
   }>();
   const [inviteRevision, setInviteRevision] = useState(0);
   const [connectionHelp, setConnectionHelp] = useState(false);
+  const [showDeactivated, setShowDeactivated] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
+  const activeMembers = members.data?.filter((member) => member.active) ?? [];
+  const deactivatedCount = (members.data?.length ?? 0) - activeMembers.length;
+  const visibleMembers = showDeactivated ? members.data : activeMembers;
   const activeKeys = keys.data?.filter((key) => !key.revoked_at) ?? [];
   const revokedCount = (keys.data?.length ?? 0) - activeKeys.length;
   const visibleKeys = showRevoked ? keys.data : activeKeys;
@@ -77,7 +81,7 @@ export function Team({
               <h2>
                 Workspace members{" "}
                 <span className="count-bubble">
-                  {members.data?.length ?? 0}
+                  {visibleMembers?.length ?? 0}
                 </span>
               </h2>
               <p>
@@ -95,12 +99,29 @@ export function Team({
               <RefreshCw size={15} /> Refresh
             </button>
           </div>
+          {deactivatedCount > 0 && (
+            <div className="panel-footnote">
+              <button
+                className="text-button"
+                aria-pressed={showDeactivated}
+                onClick={() => setShowDeactivated((value) => !value)}
+              >
+                {showDeactivated
+                  ? "Hide deactivated members"
+                  : `Show deactivated members (${deactivatedCount})`}
+              </button>
+            </div>
+          )}
           {members.error && (
             <ErrorBox message={members.error} retry={members.refresh} />
           )}{" "}
           {members.loading && !members.data ? (
             <div className="loading-panel">
               <Spinner label="Loading teammates" />
+            </div>
+          ) : members.data && visibleMembers?.length === 0 ? (
+            <div className="simple-empty">
+              {deactivatedCount ? "No active members." : "No members found."}
             </div>
           ) : (
             <div
@@ -123,7 +144,7 @@ export function Team({
                   </tr>
                 </thead>
                 <tbody>
-                  {members.data?.map((member) => (
+                  {visibleMembers?.map((member) => (
                     <tr key={member.id}>
                       <td>
                         <div className="person-cell">

@@ -68,7 +68,7 @@ export function Chat({
   const [recentContext, setRecentContext] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [clear, setClear] = useState(false);
-  const scroll = useRef<HTMLDivElement>(null);
+  const conversation = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const inFlight = useRef(false);
   const wasBusy = useRef(false);
@@ -92,7 +92,16 @@ export function Chat({
     0,
   );
   useEffect(() => {
-    scroll.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const node = conversation.current;
+    if (!node) return;
+    const empty = messages.length === 0;
+    node.scrollTo({
+      top: empty ? 0 : node.scrollHeight,
+      behavior:
+        empty || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+    });
   }, [messages, busy, confirmation]);
   function apply(result: ChatResponse) {
     setMessages((prev) => [
@@ -215,6 +224,7 @@ export function Chat({
           />
         )}
         <div
+          ref={conversation}
           className="conversation"
           role="log"
           aria-label="Conversation"
@@ -361,7 +371,6 @@ export function Chat({
               </div>
             </div>
           )}
-          <div ref={scroll} />
         </div>
         <div className="composer-area">
           {error && <ErrorBox message={error} />}

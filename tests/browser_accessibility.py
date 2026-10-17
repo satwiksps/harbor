@@ -103,7 +103,15 @@ async def main():
                     "role": "admin",
                     "active": True,
                     "created_at": "2026-01-01T00:00:00Z",
-                }
+                },
+                {
+                    "id": 2,
+                    "email": "former@example.test",
+                    "name": "Former teammate",
+                    "role": "member",
+                    "active": False,
+                    "created_at": "2026-01-01T00:00:00Z",
+                },
             ],
             "/api/keys": [],
             "/api/invites": [],
@@ -126,6 +134,7 @@ async def main():
                     "arguments": {"name": "Fixture product", "price": "249.00"},
                 },
             },
+            "/api/chat/confirm": {"message": "Action cancelled.", "tool_calls": []},
         }
         if path not in fixtures:
             unexpected.append(path)
@@ -147,6 +156,33 @@ async def main():
         page = await context.new_page()
         page.on("pageerror", lambda error: errors.append(str(error)))
         try:
+            await page.set_viewport_size({"width": 1248, "height": 714})
+            await page.goto(BASE)
+            await expect(page.locator(".chat-welcome")).to_be_visible()
+            await page.evaluate("document.fonts.ready")
+            # Allow any native smooth scroll triggered on mount to finish.
+            await page.wait_for_timeout(500)
+            initial_scroll = await page.locator(".conversation").evaluate("node => node.scrollTop")
+            assert initial_scroll == 0, f"Empty chat scrolled down by {initial_scroll}px"
+            await page.screenshot(path=str(OUT / "chat-short-desktop.png"))
+            composer = page.get_by_label("Message the Harbor assistant", exact=True)
+            await composer.fill("\n".join(["Check the store catalog."] * 30))
+            await page.get_by_role("button", name="Send message", exact=True).click()
+            await expect(page.get_by_role("heading", name="Review this action")).to_be_visible()
+            await page.wait_for_function(
+                "document.querySelector('.conversation').scrollTop > 0"
+            )
+            assert await page.evaluate("window.scrollY") == 0, "Chat scrolled the whole page"
+            await page.get_by_role("button", name="Cancel action", exact=True).click()
+            await expect(page.get_by_role("button", name="New chat", exact=True)).to_be_enabled()
+            await page.get_by_role("button", name="New chat", exact=True).click()
+            await page.get_by_role("button", name="Start new chat", exact=True).click()
+            await expect(page.locator(".chat-welcome")).to_be_visible()
+            await expect(page.locator(".conversation")).to_have_js_property("scrollTop", 0)
+            report["checks"].append(
+                {"viewport": "1248x714", "state": "empty/new chats start at top; messages scroll locally"}
+            )
+            print("PASS short desktop chat scroll position and new-chat reset", flush=True)
             for width in WIDTHS:
                 await page.set_viewport_size({"width": width, "height": 1000})
                 await page.goto(BASE + "/login")
@@ -172,6 +208,19 @@ async def main():
                 await expect(page.get_by_role("heading", name="API keys")).to_be_visible()
                 await expect(page.get_by_role("heading", name="No keys yet.")).to_be_visible()
                 await expect(page.get_by_role("region", name="Workspace members")).to_be_visible()
+                member_count = page.locator(".panel").first.locator(".count-bubble")
+                await expect(member_count).to_have_text("1")
+                await expect(page.get_by_text("Former teammate", exact=True)).to_have_count(0)
+                await page.get_by_role(
+                    "button", name="Show deactivated members (1)", exact=True
+                ).click()
+                await expect(member_count).to_have_text("2")
+                await expect(page.get_by_text("Former teammate", exact=True)).to_be_visible()
+                await page.get_by_role(
+                    "button", name="Hide deactivated members", exact=True
+                ).click()
+                await expect(member_count).to_have_text("1")
+                await expect(page.get_by_text("Former teammate", exact=True)).to_have_count(0)
                 if width <= 430:
                     help_copy = await page.locator(".key-help > div").bounding_box()
                     help_link = await page.get_by_role(
