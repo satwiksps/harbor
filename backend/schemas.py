@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -9,7 +10,23 @@ class Model(BaseModel):
 
 def clean_email(value):
     value = value.strip().lower()
-    if len(value) > 254 or value.count("@") != 1 or "." not in value.split("@")[-1]:
+    local, separator, domain = value.partition("@")
+    # Use the same ordinary ASCII mailbox form as the browser's email input.
+    # Invalid invitations otherwise create accounts their owners cannot sign into.
+    if (
+        len(value) > 254
+        or not separator
+        or not 1 <= len(local) <= 64
+        or local.startswith(".")
+        or local.endswith(".")
+        or ".." in local
+        or not re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+", local)
+        or "." not in domain
+        or any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+            for label in domain.split(".")
+        )
+    ):
         raise ValueError("Enter a valid email address")
     return value
 

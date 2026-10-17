@@ -1,8 +1,11 @@
 import asyncio
+import socket
 import threading
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
+import httpcore2
 import httpx2
 import pytest
 from fastapi import HTTPException
@@ -12,11 +15,99 @@ from sqlalchemy import select
 
 from backend import security
 from backend.gateway import tool_alias
-from backend.models import Audit, Upstream
+from backend.models import Audit, Invite, Upstream
+from backend.network import SafeNetworkBackend
 from backend.security import authenticate
 from examples import ask_gateway
 from tests.backend.test_backend import environment as environment
 from tests.backend.test_backend import seed_upstream
+
+
+async def test_dns_falls_back_to_another_validated_address(monkeypatch):
+    network = SafeNetworkBackend(set())
+    records = [
+        (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2606:4700:4700::1111", 443, 0, 0)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("1.1.1.1", 443)),
+    ]
+    monkeypatch.setattr(
+        asyncio.get_running_loop(), "getaddrinfo", AsyncMock(return_value=records)
+    )
+    stream = object()
+    connect = AsyncMock(side_effect=[httpcore2.ConnectError("IPv6 has no route"), stream])
+    monkeypatch.setattr(network.backend, "connect_tcp", connect)
+    assert await network.connect_tcp("example.test", 443, timeout=1) is stream
+    assert [call.args[0] for call in connect.await_args_list] == [
+        "2606:4700:4700::1111", "1.1.1.1"
+    ]
+
+    # Fallback must never partially accept a DNS response containing a private target.
+    records.append((socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)))
+    connect.reset_mock()
+    with pytest.raises(httpcore2.ConnectError, match="forbidden"):
+        await network.connect_tcp("example.test", 443, timeout=1)
+    connect.assert_not_awaited()
+
+
+async def test_dns_fallback_keeps_one_connection_deadline(monkeypatch):
+    network = SafeNetworkBackend(set())
+    records = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("1.1.1.1", 443)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("1.0.0.1", 443)),
+    ]
+    monkeypatch.setattr(
+        asyncio.get_running_loop(), "getaddrinfo", AsyncMock(return_value=records)
+    )
+    attempts = []
+
+    async def connect(host, *args):
+        attempts.append(host)
+        if len(attempts) == 1:
+            raise httpcore2.ConnectError("No route")
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(network.backend, "connect_tcp", connect)
+    with pytest.raises(httpcore2.ConnectTimeout, match="deadline"):
+        await network.connect_tcp("example.test", 443, timeout=0.05)
+    assert attempts == ["1.1.1.1", "1.0.0.1"]
+
+
+async def test_invalid_email_cannot_create_unusable_invitation(environment):
+    app, http = environment
+    invalid = (
+        "@example.test",
+        "person @example.test",
+        "person@example..test",
+        "person@.test",
+        "person@example.test\nother",
+        "person@example.test@other.test",
+        "person@-example.test",
+        "person@example-.test",
+        "person@exam_ple.test",
+        ".person@example.test",
+        "person..name@example.test",
+        "person.@example.test",
+        "p" * 65 + "@example.test",
+    )
+    for email in invalid:
+        invitation = await http.post("/api/invites", json={"email": email})
+        assert invitation.status_code == 422, email
+        assert invitation.json()["detail"] == "email: Value error, Enter a valid email address"
+        login = await http.post(
+            "/api/auth/login", json={"email": email, "password": "not-a-password"}
+        )
+        assert login.status_code == 422, email
+    with app.state.db.session() as session:
+        assert list(session.scalars(select(Invite))) == []
+
+    valid = await http.post(
+        "/api/invites", json={"email": "  First.Last+Tag@Sub.Example.Test  "}
+    )
+    assert valid.status_code == 201
+    assert valid.json()["email"] == "first.last+tag@sub.example.test"
+    token = valid.json()["invite_url"].rsplit("/", 1)[1]
+    assert (await http.get(f"/api/invites/{token}")).json()["email"] == (
+        "first.last+tag@sub.example.test"
+    )
 
 
 @pytest.mark.parametrize("environment", ["file"], indirect=True)

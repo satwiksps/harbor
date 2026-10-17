@@ -80,10 +80,20 @@ class SafeNetworkBackend(httpcore2.AsyncNetworkBackend):
             not ipaddress.ip_address(address).is_global for address in addresses
         ):
             raise httpcore2.ConnectError("MCP destination resolved to a forbidden address")
-        # Connect to the validated numeric address, preserving original TLS SNI in httpcore.
-        return await self.backend.connect_tcp(
-            addresses[0], port, timeout, local_address, socket_options
-        )
+        # Connect only to validated numeric addresses, preserving the original TLS SNI.
+        # A host may publish IPv6 even when this installation only has an IPv4 route.
+        try:
+            async with asyncio.timeout(timeout if timeout is not None else 5):
+                for index, address in enumerate(addresses):
+                    try:
+                        return await self.backend.connect_tcp(
+                            address, port, timeout, local_address, socket_options
+                        )
+                    except (httpcore2.ConnectError, httpcore2.ConnectTimeout):
+                        if index == len(addresses) - 1:
+                            raise
+        except TimeoutError:
+            raise httpcore2.ConnectTimeout("MCP connection deadline exceeded") from None
 
     async def connect_unix_socket(self, *args, **kwargs):
         raise httpcore2.ConnectError("Unix sockets are not allowed")
