@@ -32,7 +32,7 @@ The helper checks the approved documentation inputs, runs MkDocs in strict mode 
 4. Run the strict build, then check the changed page on a desktop and a narrow screen. Check tables, code blocks, search results, and heading links.
 5. Keep outcomes and limitations together. Recorded verification is evidence from a particular run, not a guarantee that every deployment has passed it.
 
-Use fictional examples. Keep passwords, API keys, invitation tokens, customer information, private project material, and raw recordings out of documentation. The existing dashboard screenshot is excluded from the website because it identifies the local operator.
+Use fictional examples. Keep passwords, API keys, invitation tokens, customer information, private project material, and raw recordings out of documentation. Store runtime screenshots in ignored `.runtime`, not under `docs/`; inspect and sanitize any image deliberately chosen for publication.
 
 ## Dependency updates
 
@@ -75,7 +75,7 @@ After each publication, check the Pages deployment's commit SHA and successful b
 
 ## Publication boundaries
 
-Only `.runtime/docs-site` is the Pages output directory. Never point hosting at the repository root, `.runtime` or `docs` itself. MkDocs reads the approved documentation source and excludes the operator screenshot, dependency files and raw theme templates from direct publication. The build helper verifies those exclusions and the site's indexing directives.
+Only `.runtime/docs-site` is the Pages output directory. Never point hosting at the repository root, `.runtime` or `docs` itself. MkDocs reads the approved documentation source and excludes dependency files and raw theme templates from direct publication. The build helper rejects unreviewed source files and verifies output exclusions and indexing directives.
 
 Keep application source, Git metadata, credentials, raw runtime evidence and identifying details out of the generated site. Files placed under `docs/` can become public assets even when they are not linked from navigation, so review new assets as carefully as page text. No application secrets belong in Pages environment variables.
 

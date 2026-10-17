@@ -14,8 +14,9 @@ Use Python 3.12 with uv for the backend and Node.js 24 for frontend development.
 | `scripts/` | Cluster, release, backup and verification commands |
 | `tests/` | Unit, protocol, browser and deployed acceptance checks |
 | `examples/` | Independent MCP reference agent |
+| `docs/` and `mkdocs.yml` | Public documentation content and navigation |
 
-Read the [system design](system-design.md) before changing cross-service behavior. The [API and environment reference](CONTRACT.md) describes the frontend/backend contract.
+Read the [system design](system-design.md) before changing cross-service behavior. The [API and environment reference](CONTRACT.md) describes the frontend/backend contract. Generated `.venv`, `.tools`, `.runtime`, build outputs and private `.secrets` are local support directories, not application source.
 
 ## Install and check
 
@@ -68,6 +69,8 @@ uv run python -m tests.browser_visual
 ```
 
 The acceptance harness calls all three upstreams over MCP and checks hidden writes, disabled servers, SSRF, revocation and audit isolation. UI regression tests combine real sign-in with browser response fixtures for reproducible failure and race conditions, without calling Gemini. Visual checks inspect the deployed pages at widths from 320 to 1440 px. Runtime evidence stays private under `.runtime`; harness-created API keys are revoked during cleanup.
+
+The invitation check accepts real invitations and changes the browser session. Use a separate browser profile for an interactive administrator session while it runs.
 
 For accessibility checks with browser-local API fixtures:
 

@@ -1,8 +1,10 @@
 # Harbor
 
-A team MCP gateway for a WooCommerce store. Administrators connect tools once; members use one endpoint or the dashboard chat with their own identity and permissions.
+Harbor lets a team use one WooCommerce store through a shared tool gateway. An administrator connects the services and reviews access. Members then use dashboard chat or an external client with their own identity and permissions.
 
-The React and TypeScript dashboard sits on a Python, FastAPI and MCP gateway. The store, gateway and three original MCP servers run together in Kubernetes.
+**Model Context Protocol (MCP)** is the interface clients use to discover tools and call them with structured arguments. Harbor is the **gateway** that checks who is calling before forwarding a request. A connected **upstream** is a service behind that gateway, such as the WooCommerce adapter. You do not need to configure each upstream in every client.
+
+For example, a member can read today's orders and ask for a shipping estimate. An administrator can also create a product, with an approval step in dashboard chat. Both users' tool calls appear in Activity.
 
 ## Start here
 
@@ -17,22 +19,30 @@ The React and TypeScript dashboard sits on a Python, FastAPI and MCP gateway. Th
 | Review the security boundary and remaining risks | [Threat model](threat-model.md) |
 | Inspect what was tested and corrected | [Verification](verification.md) and [audit record](audit.md) |
 
-## What is included
+## What runs locally
 
-- A persistent WordPress and WooCommerce storefront with cash-on-delivery checkout.
-- Three Streamable HTTP MCP servers: commerce, store policies and shipping quotes. The commerce server implements five product and order tools.
+| Component | Responsibility |
+| --- | --- |
+| Harbor dashboard and gateway | Chat, team access, API keys, connections and activity |
+| WooCommerce MCP server | Read products and orders; create products and update order status |
+| Store policies MCP server | Read and search versioned sample policies |
+| Shipping MCP server | Estimate delivery charges using the store's sample rate table |
+| Harbor Supply storefront | Browse products and complete a cash-on-delivery checkout |
+
+The React and TypeScript dashboard, Python gateway, three MCP servers and storefront run together in Kubernetes. PostgreSQL stores Harbor's records; MariaDB and a separate content volume store WordPress data.
+
+## Capabilities
+
 - A dynamic server registry with collision-safe tool names, cached discovery, isolated timeouts and credentials stored in Kubernetes Secrets.
 - Invitations, administrator and member roles, individually hashed API keys, immediate revocation and per-tool role permissions.
 - Gemini chat that calls the gateway as the signed-in user, shows tool results and asks for confirmation before a write.
 - An attributable audit trail, SSRF protection, network isolation and least-privilege Kubernetes RBAC.
 - One Helm chart with local and production values, repeatable bootstrap, backup scripts and CI checks.
 
-The project focuses on one store and one gateway replica, with per-tool permissions and security controls around every gateway call.
-
 ## Scope and evidence
 
 Local execution uses your computer and has no VPS dependency. Chat requires a Gemini API key and is subject to the provider's quota. A missing key leaves management and MCP available, with an explicit unavailable-chat notice.
 
-This is a single-node demonstration with production deployment guidance. It does not claim high availability or an already deployed public VPS. The [verification record](verification.md) separates local checks, historical end-to-end evidence and work that has not been repeated. The [threat model](threat-model.md) describes the remaining operational limits.
+The system supports one team, one store and one gateway replica. The storefront is a demonstration: it does not collect payments, send email or book carriers. Production deployment guidance is provided, but a public VPS and high availability have not been verified. The [verification record](verification.md) distinguishes completed checks from remaining work, and the [threat model](threat-model.md) explains the security boundaries.
 
-The application repository is private. Repository access is needed to inspect or run its source. The [API and environment reference](CONTRACT.md), [visual provenance](brand-notes.md) and [technical walkthrough](demo.md) provide supporting detail.
+This website hosts documentation only. The application repository is private, so repository access is needed to inspect or run the source. Start with [installation](getting-started.md), or use the [technical walkthrough](demo.md) to review an already running system.

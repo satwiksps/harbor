@@ -4,6 +4,8 @@ Harbor is a single-team WooCommerce operations workspace. It demonstrates a comp
 
 ## Components
 
+An upstream is a connected MCP service. The gateway is the shared entry point that authenticates clients, applies permissions and routes their calls.
+
 ```mermaid
 ---
 config:
@@ -50,13 +52,15 @@ Dashboard chat uses a short-lived, signed delegation token bound to the verified
 
 The chat loop disables automatic SDK function execution. It presents permitted tools, receives function calls, executes read operations through MCP and supplies results back to the model. Mutations pause for a one-use confirmation bound to the user and session. Calls bind the intended tool to its upstream revision, destination, schema and permissions. The gateway checks that binding and current authority again after waiting for capacity and completing the upstream handshake. Automatic chat calls also require the tool to remain read-only. A changed connection or permission requires a fresh proposal. A bounded number of rounds, calls, output bytes and concurrent requests limits resource use.
 
+The confirmation flow is part of dashboard chat. External administrator clients may invoke write tools directly. Member keys remain limited to tools the administrator has classified as read operations.
+
 ## Discovery, routing and failures
 
 Public tool names combine an immutable server slug, a readable original tool name and a short hash of the original name. Discovery rejects a catalogue if two original names still produce the same alias. The mapping is resolved explicitly; the gateway does not trust a client-supplied destination URL. Aliases fit within 60 characters. The policies and shipping services both expose `search`, providing a real collision example. JSON Schema validation has no remote or filesystem reference resolver; only in-document references are permitted.
 
 Each upstream's tool catalogue is refreshed independently under a timeout. Tool listing reads the stored catalogues and applies live enabled and permission settings, so it does not wait for a dead upstream. A failed refresh retains the last known catalogue and marks the server Unreachable. Calls return clear failures and other services continue working. Disabled servers disappear from discovery immediately. Clients that cache their tool list need a refresh; direct calls using stale names are still rejected. The SDK advertises zero cache TTL. This implementation does not claim push notifications for every legacy client.
 
-Execution has per-upstream concurrency limits and an overall deadline. Untrusted schema work runs in one reusable subprocess with a two-second per-operation deadline; timeout or cancellation kills and reaps it. Input is capped at 512 KiB, 64 nesting levels and 20,000 JSON nodes. Linux deployments also restrict the worker's address space. Queued validation remains subject to the surrounding tool or discovery deadline, and ordinary API requests do not wait on the worker.
+Execution has per-upstream concurrency limits and an overall deadline. Untrusted schema work runs in one reusable subprocess. Starting the process and importing its validator have a separate five-second readiness limit; each untrusted validation operation retains a two-second execution deadline. Timeout or cancellation kills and reaps the worker. Input is capped at 512 KiB, 64 nesting levels and 20,000 JSON nodes. Linux deployments also restrict the worker's address space. Startup, queueing and execution remain subject to the surrounding tool or discovery deadline, and ordinary API requests do not wait on the worker.
 
 Writes are not automatically retried. Any failure after write dispatch can mean the store committed a mutation before the response was usable, so the response and audit record advise reconciling state before retrying. Supplying a unique SKU makes product creation easier to reconcile, but is not a claim of exactly-once delivery.
 
