@@ -276,9 +276,11 @@ export function ConfirmModal({
 }
 export function Toast({
   message,
+  error = false,
   close,
 }: {
   message: string;
+  error?: boolean;
   close: () => void;
 }) {
   useEffect(() => {
@@ -286,8 +288,11 @@ export function Toast({
     return () => clearTimeout(timer);
   }, [close, message]);
   return (
-    <div className="toast" role="status">
-      <CheckCircle2 size={18} />
+    <div
+      className={`toast${error ? " danger" : ""}`}
+      role={error ? "alert" : "status"}
+    >
+      {error ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
       {message}
       <button
         className="icon-button"

@@ -49,10 +49,14 @@ export function App() {
   const [auth, setAuth] = useState<AuthResponse | null>();
   const [authError, setAuthError] = useState("");
   const [page, setPage] = useState<Page>(currentPage);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{
+    message: string;
+    error?: boolean;
+  } | null>(null);
   const [mobile, setMobile] = useState(false);
   const authRequest = useRef(0);
-  const closeToast = useCallback(() => setToast(""), []);
+  const closeToast = useCallback(() => setToast(null), []);
+  const notify = useCallback((message: string) => setToast({ message }), []);
   const acceptToken =
     new URLSearchParams(location.search).get("token") ??
     (location.pathname.startsWith("/invite/")
@@ -87,7 +91,7 @@ export function App() {
     setAuthError("");
     setPage("chat");
     setMobile(false);
-    setToast(`Signed in as ${response.user.email}.`);
+    setToast({ message: `Signed in as ${response.user.email}.` });
     announceSessionChange();
   }, []);
   useEffect(() => {
@@ -97,7 +101,7 @@ export function App() {
       if (event.key !== sessionChangeKey) return;
       setCsrf("");
       setAuth(undefined);
-      setToast("");
+      setToast(null);
       setMobile(false);
       void loadAuth();
     };
@@ -163,21 +167,23 @@ export function App() {
       page={page}
       mobile={mobile}
       setMobile={setMobile}
-      notify={setToast}
+      notify={notify}
       onLogout={async () => {
         try {
           await api("/auth/logout", { method: "POST" });
           authRequest.current++;
           setCsrf("");
           setAuth(null);
-          setToast("");
+          setToast(null);
           announceSessionChange();
         } catch (e) {
-          setToast(errorMessage(e));
+          setToast({ message: errorMessage(e), error: true });
         }
       }}
     >
-      {toast && <Toast message={toast} close={closeToast} />}
+      {toast && (
+        <Toast message={toast.message} error={toast.error} close={closeToast} />
+      )}
     </Workspace>
   );
 }
@@ -434,6 +440,8 @@ function Workspace({
               health={health.data}
               servers={servers.data ?? []}
               serversLoading={servers.loading && !servers.data}
+              serversError={servers.error}
+              refreshServers={servers.refresh}
             />
           </div>
           {page === "connections" && (

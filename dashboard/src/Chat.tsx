@@ -50,11 +50,15 @@ export function Chat({
   health,
   servers,
   serversLoading,
+  serversError,
+  refreshServers,
 }: {
   user: User;
   health?: Health;
   servers: Server[];
   serversLoading: boolean;
+  serversError: string;
+  refreshServers: () => Promise<void>;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -204,6 +208,12 @@ export function Chat({
             </div>
           </div>
         )}
+        {serversError && (
+          <ErrorBox
+            message={`Connection status is unavailable. ${serversError}`}
+            retry={refreshServers}
+          />
+        )}
         <div
           className="conversation"
           role="log"
@@ -226,9 +236,13 @@ export function Chat({
                 <span>your store.</span>
               </h2>
               <p>
-                Find products, look up policies, or plan a change.
-                <br className="desktop-only" /> Review write actions before they
-                run.
+                {user.role === "admin"
+                  ? "Find products, look up policies, or plan a change."
+                  : "Find products, look up policies, and check shipping."}
+                <br className="desktop-only" />{" "}
+                {user.role === "admin"
+                  ? "Review write actions before they run."
+                  : "Your account can use read tools only."}
               </p>
               <div className="suggestions">
                 {suggestions.map((s) => (
@@ -439,6 +453,11 @@ export function Chat({
         <div className="context-connections">
           {serversLoading ? (
             <Spinner label="Checking connections" />
+          ) : serversError ? (
+            <p className="context-empty">
+              Connection status could not be checked. Retry to see the current
+              tools.
+            </p>
           ) : servers.length ? (
             servers.map((server) => (
               <div className="context-connection" key={server.id}>
@@ -495,8 +514,16 @@ export function Chat({
         <div className="context-step">
           <span>02</span>
           <div>
-            <strong>Review before a change</strong>
-            <p>Write actions wait for your approval.</p>
+            <strong>
+              {user.role === "admin"
+                ? "Review before a change"
+                : "Use your team access"}
+            </strong>
+            <p>
+              {user.role === "admin"
+                ? "Write actions wait for your approval."
+                : "Your role allows read tools only."}
+            </p>
           </div>
         </div>
         <div className="context-step">
@@ -507,10 +534,14 @@ export function Chat({
           </div>
         </div>
         <div className="context-bottom">
-          <Badge tone={connected.length ? "good" : "warning-badge"}>
-            {serversLoading
-              ? "Checking tools"
-              : `${toolCount} tools discovered`}
+          <Badge
+            tone={!serversError && connected.length ? "good" : "warning-badge"}
+          >
+            {serversError
+              ? "Tool status unavailable"
+              : serversLoading
+                ? "Checking tools"
+                : `${toolCount} tools discovered`}
           </Badge>
           <span>
             <Clock3 size={12} />

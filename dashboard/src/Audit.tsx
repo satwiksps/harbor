@@ -176,7 +176,7 @@ export function AuditPage({
             className="table-scroll"
             tabIndex={0}
             role="region"
-            aria-label="Scrollable data table"
+            aria-label="Tool call history"
           >
             <table className="audit-table">
               <thead>

@@ -107,7 +107,7 @@ export function Team({
               className="table-scroll"
               tabIndex={0}
               role="region"
-              aria-label="Scrollable data table"
+              aria-label="Workspace members"
             >
               <table>
                 <thead>
@@ -258,7 +258,7 @@ export function Team({
             className="table-scroll"
             tabIndex={0}
             role="region"
-            aria-label="Scrollable data table"
+            aria-label="API keys"
           >
             <table>
               <thead>
@@ -561,7 +561,7 @@ function Invitations({ revision }: { revision: number }) {
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Scrollable data table"
+          aria-label="Invitations"
         >
           <table>
             <thead>

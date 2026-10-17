@@ -336,9 +336,12 @@ code {
 }
 .notice > span {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .notice > div {
   flex: 1;
+  min-width: 0;
 }
 .notice strong {
   display: block;
@@ -790,6 +793,7 @@ code {
   font-weight: 550;
   letter-spacing: -0.2px;
   margin-bottom: 5px;
+  overflow-wrap: anywhere;
 }
 .server-url {
   font-size: 10px;
@@ -1355,6 +1359,11 @@ select {
 .modal-heading h2 {
   font-size: 21px;
   letter-spacing: -0.6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.modal-heading > .icon-button {
+  flex-shrink: 0;
 }
 .modal p.muted {
   font-size: 12px;
@@ -1383,6 +1392,11 @@ select {
   padding: 13px 12px 13px 17px;
   font-size: 12px;
   box-shadow: 0 4px 30px #2c472721;
+}
+.toast.danger {
+  color: #923b35;
+  background: #fcf1ed;
+  border-color: #edd4cc;
 }
 .auth-layout {
   display: flex;
@@ -1603,6 +1617,7 @@ select {
   letter-spacing: 1.6px;
   color: #8a997b;
   margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
 .chat-welcome h2 {
   font-size: 43px;
@@ -1801,6 +1816,7 @@ select {
   font-size: 11px;
   font-weight: 500;
   color: #62764f;
+  overflow-wrap: anywhere;
 }
 .context-connection > div > span {
   font-size: 9px;
@@ -1924,6 +1940,7 @@ select {
   align-items: center;
   gap: 10px;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 .message-label > span {
   font-size: 8px;
@@ -2487,6 +2504,13 @@ select {
   .modal-heading h2 {
     font-size: 20px;
   }
+  .key-help {
+    align-items: flex-start;
+  }
+  .key-help > div {
+    flex-basis: calc(100% - 31px);
+    min-width: 0;
+  }
   .toast {
     bottom: 18px;
     right: 18px;
@@ -2500,6 +2524,21 @@ select {
   }
 }
 @media (max-width: 430px) {
+  .audit-filters label {
+    flex-basis: 100%;
+  }
+  .pagination {
+    flex-wrap: wrap;
+  }
+  .pagination > div {
+    margin-left: auto;
+  }
+  .notice:has(.text-button) {
+    flex-wrap: wrap;
+  }
+  .notice > .text-button {
+    margin-left: 29px;
+  }
   .chat-heading {
     padding: 18px;
   }

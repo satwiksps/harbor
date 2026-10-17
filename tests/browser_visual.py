@@ -34,6 +34,7 @@ async def main():
         async def capture(name, width, height):
             await page.set_viewport_size({"width": width, "height": height})
             await page.evaluate("document.fonts.ready")
+            await page.evaluate("window.scrollTo(0, 0)")
             await page.screenshot(path=str(OUT / f"{name}-{width}.png"), full_page=True)
             geometry = await page.evaluate("""() => ({
                 viewport: innerWidth,

@@ -55,16 +55,26 @@ async def main():
     report = {"complete": False, "scope": "fixture-accessibility", "checks": []}
     errors = []
     unexpected = []
+    role = "admin"
+    user_name = "Reviewer"
+    registry_unavailable = False
+    connection_name = "Warehouse" + "x" * 91
 
     async def api_fixture(route):
         path = urlsplit(route.request.url).path
+        if path == "/api/servers" and registry_unavailable:
+            await route.fulfill(status=503, json={"detail": "Registry temporarily unavailable"})
+            return
+        if path == "/api/auth/logout":
+            await route.fulfill(status=503, json={"detail": "Sign-out temporarily unavailable"})
+            return
         fixtures = {
             "/api/auth/me": {
                 "user": {
                     "id": 1,
                     "email": "reviewer@example.test",
-                    "name": "Reviewer",
-                    "role": "admin",
+                    "name": user_name,
+                    "role": role,
                 },
                 "csrf_token": "fixture-only",
             },
@@ -74,7 +84,30 @@ async def main():
                 "store_url": "http://store.example.test",
                 "gateway_url": "http://gateway.example.test/mcp",
             },
-            "/api/servers": [],
+            "/api/servers": [
+                {
+                    "id": "fixture",
+                    "name": connection_name,
+                    "slug": "warehouse",
+                    "url": "https://tools.example.test/mcp",
+                    "enabled": True,
+                    "status": "healthy",
+                    "tools": [],
+                }
+            ],
+            "/api/members": [
+                {
+                    "id": 1,
+                    "email": "reviewer@example.test",
+                    "name": "Reviewer",
+                    "role": "admin",
+                    "active": True,
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
+            ],
+            "/api/keys": [],
+            "/api/invites": [],
+            "/api/audit": {"items": [], "total": 0},
             "/api/chat": {
                 "message": "Review the proposed change.",
                 "tool_calls": [
@@ -134,6 +167,89 @@ async def main():
                 if width in (320, 1440):
                     await page.screenshot(path=str(OUT / f"chat-{width}.png"), full_page=True)
                 print(f"PASS accessible store link and text contrast at {width}px", flush=True)
+
+                await page.goto(BASE + "/#team")
+                await expect(page.get_by_role("heading", name="API keys")).to_be_visible()
+                await expect(page.get_by_role("heading", name="No keys yet.")).to_be_visible()
+                await expect(page.get_by_role("region", name="Workspace members")).to_be_visible()
+                if width <= 430:
+                    help_copy = await page.locator(".key-help > div").bounding_box()
+                    help_link = await page.get_by_role(
+                        "button", name="Connection details"
+                    ).bounding_box()
+                    assert help_copy and help_link
+                    assert help_link["y"] >= help_copy["y"] + help_copy["height"]
+                    assert help_copy["width"] >= 180
+                await page.get_by_role("button", name="Connection details").click()
+                await expect(page.get_by_role("dialog")).to_be_visible()
+                assert await page.get_by_role("dialog").evaluate(
+                    "node => node.scrollWidth <= node.clientWidth"
+                ), f"Connection details overflow at {width}px"
+                await page.keyboard.press("Escape")
+                if width == 320:
+                    await page.evaluate("window.scrollTo(0, 0)")
+                    await page.screenshot(path=str(OUT / "team-320.png"), full_page=True)
+
+                await page.goto(BASE + "/#audit")
+                await expect(page.get_by_role("heading", name="No tool calls yet.")).to_be_visible()
+                if width <= 430:
+                    first = await page.get_by_label("Filter by outcome").bounding_box()
+                    second = await page.get_by_label("Filter by connection").bounding_box()
+                    assert first and second and second["y"] >= first["y"] + first["height"]
+                if width == 320:
+                    await page.screenshot(path=str(OUT / "activity-320.png"), full_page=True)
+
+                await page.goto(BASE + "/#connections")
+                await expect(page.get_by_role("heading", name=connection_name)).to_be_visible()
+                assert await page.locator(".server-card").evaluate(
+                    "node => node.scrollWidth <= node.clientWidth"
+                ), f"Long connection name overflows at {width}px"
+                await page.get_by_role("button", name=f"Remove {connection_name}").click()
+                await expect(page.get_by_role("dialog")).to_be_visible()
+                assert await page.get_by_role("dialog").evaluate(
+                    "node => node.scrollWidth <= node.clientWidth"
+                ), f"Long dialog title overflows at {width}px"
+                await page.keyboard.press("Escape")
+                assert await page.evaluate(
+                    "document.documentElement.scrollWidth <= innerWidth"
+                ), f"Page overflow at {width}px"
+                report["checks"].append(
+                    {"width": width, "layout": "team, activity, long connection name and dialogs"}
+                )
+                print(f"PASS content and dialog layouts at {width}px", flush=True)
+
+            registry_unavailable = True
+            await page.goto(BASE)
+            await expect(page.get_by_role("alert")).to_contain_text(
+                "Connection status is unavailable."
+            )
+            await expect(page.get_by_text("No tools connected yet.", exact=False)).to_have_count(0)
+            await expect(page.get_by_text("Tool status unavailable", exact=True)).to_be_visible()
+            registry_unavailable = False
+            await page.get_by_role("button", name="Try again", exact=True).click()
+            await expect(page.get_by_role("alert")).to_have_count(0)
+            await expect(page.locator(".context-connection strong")).to_have_text(connection_name)
+            report["checks"].append({"state": "connection failure is distinct from empty and retries"})
+            await page.get_by_role("button", name="Sign out", exact=True).click()
+            await expect(page.get_by_role("alert")).to_have_text("Sign-out temporarily unavailable")
+            await expect(page.locator(".toast.danger")).to_be_visible()
+            await expect(page.locator(".main-shell")).to_be_visible()
+            await page.get_by_role("button", name="Dismiss notification").click()
+            report["checks"].append({"state": "failed sign-out is an error and retains the workspace"})
+
+            role = "member"
+            await page.goto(BASE)
+            await expect(page.get_by_text("Your account can use read tools only.")).to_be_visible()
+            await expect(page.get_by_text("Write actions wait for your approval.")).to_have_count(0)
+            report["checks"].append({"state": "member onboarding describes read-only access"})
+            user_name = "A" * 100
+            await page.set_viewport_size({"width": 320, "height": 720})
+            await page.goto(BASE)
+            await expect(page.locator(".welcome-kicker")).to_contain_text(user_name)
+            assert await page.locator(".conversation").evaluate(
+                "node => node.scrollWidth <= node.clientWidth"
+            ), "A long display name overflows the conversation"
+            report["checks"].append({"state": "long display names fit the mobile conversation"})
             assert not errors, errors
             assert not unexpected, unexpected
             report["complete"] = True
