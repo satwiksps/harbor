@@ -49,6 +49,48 @@ async def test_worker_preserves_validation_and_is_reused(boundary):
     assert worker.returncode is None
 
 
+async def test_slow_worker_startup_does_not_spend_schema_execution_budget(boundary, monkeypatch):
+    spawn = asyncio.create_subprocess_exec
+
+    async def slow_spawn(*args, **kwargs):
+        await asyncio.sleep(0.2)
+        return await spawn(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", slow_spawn)
+    boundary.timeout_seconds = 0.1
+    await boundary.validate({"type": "integer"}, 2)
+    assert boundary._process.returncode is None
+
+
+async def test_worker_startup_is_bounded_and_can_be_retried(boundary, monkeypatch):
+    spawn = asyncio.create_subprocess_exec
+    spawned = []
+
+    async def stalled_spawn(*args, **kwargs):
+        # Start a real process that never announces readiness.
+        process = await spawn(
+            sys.executable,
+            "-c",
+            "import time; time.sleep(60)",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            **({"creationflags": kwargs["creationflags"]} if "creationflags" in kwargs else {}),
+        )
+        spawned.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", stalled_spawn)
+    boundary.startup_timeout_seconds = 0.5
+    with pytest.raises(TimeoutError):
+        await boundary.check(True)
+    assert spawned and spawned[0].returncode is not None
+    assert boundary._process is None
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    boundary.startup_timeout_seconds = 5
+    await boundary.validate({"type": "integer"}, 2)
+
+
 @pytest.mark.parametrize("reference", ["https://example.test/schema", "file:///etc/passwd"])
 async def test_worker_rejects_external_references(boundary, reference):
     with pytest.raises(ValueError, match="invalid"):

@@ -14,8 +14,9 @@ from referencing import Registry
 class SchemaBoundary:
     """Reuse one killable worker so schema CPU never runs on the API event loop."""
 
-    def __init__(self, timeout_seconds=2.0):
+    def __init__(self, timeout_seconds=2.0, startup_timeout_seconds=5.0):
         self.timeout_seconds = timeout_seconds
+        self.startup_timeout_seconds = startup_timeout_seconds
         self._lock = asyncio.Lock()
         self._process = None
         self._closed = False
@@ -35,13 +36,15 @@ class SchemaBoundary:
         if len(payload) > 512 * 1024:
             raise ValueError("Tool schema and arguments exceed the validation limit")
         # Only one validation can consume CPU. The caller's tool/discovery deadline
-        # bounds queueing, while this deadline bounds each worker operation.
+        # bounds queueing and startup; the shorter worker deadline bounds untrusted work.
         async with self._lock:
-            async with asyncio.timeout(self.timeout_seconds):
-                if self._closed:
-                    raise ValueError("Schema validation is closed")
-                try:
-                    if self._process is None:
+            if self._closed:
+                raise ValueError("Schema validation is closed")
+            try:
+                if self._process is None:
+                    # Python imports can be slow on a busy machine. Wait for trusted
+                    # startup to finish before charging the schema's execution budget.
+                    async with asyncio.timeout(self.startup_timeout_seconds):
                         self._process = await asyncio.create_subprocess_exec(
                             sys.executable,
                             "-u",
@@ -51,19 +54,22 @@ class SchemaBoundary:
                             stderr=asyncio.subprocess.DEVNULL,
                             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
                         )
+                        if await self._process.stdout.readline() != b"ready\n":
+                            raise ValueError("Schema validation worker did not become ready")
+                async with asyncio.timeout(self.timeout_seconds):
                     process = self._process
                     process.stdin.write(payload)
                     await process.stdin.drain()
                     result = await process.stdout.readline()
                     if result not in (b"valid\n", b"invalid\n"):
                         raise ValueError("Schema validation worker failed")
-                except BaseException:
-                    # A cancelled request must not leave expensive work running or
-                    # allow the next request to consume the previous result.
-                    await self._stop()
-                    raise
-                if result == b"invalid\n":
-                    raise ValueError("Tool schema or arguments are invalid")
+            except BaseException:
+                # A cancelled request must not leave expensive work running or
+                # allow the next request to consume the previous result.
+                await self._stop()
+                raise
+            if result == b"invalid\n":
+                raise ValueError("Tool schema or arguments are invalid")
 
     async def _stop(self):
         process, self._process = self._process, None
@@ -196,6 +202,8 @@ def _validation_worker():
         # wall deadline. Limit this child independently of the gateway container.
         memory_limit = 128 * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
+    sys.stdout.buffer.write(b"ready\n")
+    sys.stdout.buffer.flush()
     for line in sys.stdin.buffer:
         try:
             request = json.loads(line)
