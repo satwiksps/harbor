@@ -1,4 +1,15 @@
 # Helpers used by the explicit maintenance command and its isolated tests.
+function Get-AvailableLoopbackPort {
+    # k3d stores a literal port 0 in kubeconfig, so resolve an ephemeral port first.
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    try {
+        $listener.Start()
+        return $listener.LocalEndpoint.Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
 function Get-LocalLoopbackPlan {
     param([hashtable]$Bindings, [int]$RecoveryApiPort = 0)
     $expected = @('80/tcp', '443/tcp', '6443/tcp')

@@ -30,7 +30,7 @@ gateway:
   replicas: 1
   geminiModel: gemini-3.1-flash-lite
   adminEmail: admin@harbor.local
-  adminName: Satwik
+  adminName: Administrator
   secureCookies: false
   # Single-node k3s pod range. NetworkPolicy also restricts callers to Traefik.
   # Local deploy.ps1 discovers the node's actual range; verify it for other clusters.

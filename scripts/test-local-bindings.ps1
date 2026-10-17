@@ -82,6 +82,12 @@ try {
     if (-not $failed) { throw 'Unexpected ports must stop migration' }
     Write-Host 'PASS: bindings-reject-extra-ports'
 
+    $apiPort = Get-AvailableLoopbackPort
+    if ($apiPort -lt 1 -or $apiPort -gt 65535) { throw 'API port must be resolved before cluster creation' }
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $apiPort)
+    try { $listener.Start() } finally { $listener.Stop() }
+    Write-Host 'PASS: fresh-api-port-is-valid-and-released'
+
     # Parse the real fresh-install command and capture its expanded arguments.
     $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'new-local-cluster.ps1'), [ref]$null, [ref]$null)
     $creation = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.Extent.Text -like 'Invoke-Native * cluster create *' }, $true))
@@ -91,9 +97,10 @@ try {
         $script:CreateArguments = $Arguments
     }
     & ([scriptblock]::Create($creation[0].Extent.Text))
-    foreach ($mapping in @('127.0.0.1:8080:80@loadbalancer', '127.0.0.1:8443:443@loadbalancer', '127.0.0.1:0')) {
+    foreach ($mapping in @('127.0.0.1:8080:80@loadbalancer', '127.0.0.1:8443:443@loadbalancer', "127.0.0.1:$apiPort")) {
         if ($script:CreateArguments -notcontains $mapping) { throw "Missing loopback mapping: $mapping" }
     }
+    if ($script:CreateArguments -contains '127.0.0.1:0') { throw 'A literal API port zero breaks kubeconfig' }
     Write-Host 'PASS: fresh-cluster-loopback-bindings'
 } finally {
     $planFile = Join-Path $testRoot 'local-binding-migration.json'
