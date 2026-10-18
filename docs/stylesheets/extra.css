@@ -25,18 +25,25 @@
   border-bottom: 1px solid #0f5b58;
 }
 
-.md-header__topic {
-  font-weight: 600;
+.md-header__button.harbor-wordmark {
+  display: flex;
+  align-items: center;
+  min-height: 2.2rem;
+  margin-inline-end: auto;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.md-header__button.harbor-wordmark:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .md-search__input::placeholder {
   color: inherit;
   opacity: 0.8;
-}
-
-.md-header__button.md-logo img {
-  width: 1.65rem;
-  height: 1.65rem;
 }
 
 .md-main__inner {

@@ -32,6 +32,7 @@ PUBLIC_DOCS = {
     "assets/mark.svg",
     "stylesheets/extra.css",
     "theme/main.html",
+    "theme/partials/header.html",
 }
 BLOCKED_CONTENT = re.compile(
     r"urumi|\b(?:recruit(?:ment|ing|ers?)?|submissions?|internships?|assignments?)\b",
