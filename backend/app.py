@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.requests import Request as StarletteRequest
 
 from backend.chat import ChatAgent
@@ -29,6 +29,7 @@ from backend.models import (
     uid,
 )
 from backend.network import validate_header, validate_url
+from backend.observability import AuditWindow, audit_summary
 from backend.schemas import (
     AcceptInvite,
     ChatBody,
@@ -671,6 +672,21 @@ def create_app(settings: Settings | None = None):
                     )
                 server.permissions = {**server.permissions, **body.permissions}
                 return public_server(server)
+
+    @app.get("/api/audit/summary")
+    def activity_summary(
+        window: AuditWindow = "24h",
+        server_id: str | None = Query(None, max_length=36),
+        user_id: str | None = Query(None, max_length=36),
+        principal=Depends(current),
+    ):
+        try:
+            return audit_summary(db, principal, window, now(), server_id, user_id)
+        except SQLAlchemyError:
+            logger.warning("Unable to load activity summary")
+            raise HTTPException(
+                503, "Activity summary is temporarily unavailable", headers={"Retry-After": "1"}
+            ) from None
 
     @app.get("/api/audit")
     def audit(
