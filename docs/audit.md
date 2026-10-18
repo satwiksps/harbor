@@ -1,8 +1,26 @@
 # Audit and corrective work
 
-Audit date: 15 October 2026. Scope: application logic, authorization, chat, MCP routing, WooCommerce, local operations and responsive presentation. This is an engineering review with automated and manual checks, not an independent penetration test or a guarantee that no defects remain.
+Scope: application logic, authorization, chat, MCP routing, WooCommerce, local operations and responsive presentation. Findings are grouped by review date. This is an engineering review with automated and manual checks, not an independent penetration test or a guarantee that no defects remain.
 
-## Corrected behavior
+## Reliability and documentation review, 20 October 2026
+
+| Area | Finding and correction |
+| --- | --- |
+| Fresh cluster startup | Asking k3d for API port `0` left its metadata and kubeconfig pointing to port `0` even after Docker assigned a usable port. Setup now chooses a free loopback port before creation and synchronizes kubeconfig with the observed binding. A real cluster creation reached Ready, and the local binding and recovery guards passed. |
+| Schema worker startup | Python process startup and validator imports could consume the schema execution deadline before validation began. A separate five-second readiness limit now covers startup while preserving the two-second untrusted execution limit and the outer request deadline. |
+| Checkout shipping | Floating-point addition could place an exact 1.5 kg package in the next rate band. Checkout normalizes the computed weight before rounding up. Nine PHP regression cases and the running WooCommerce hook verify exact boundaries, remote rates and pound-to-kilogram conversion. |
+| Interface recovery | Connection loading failures lacked a clear retry path, and a failed sign-out could hide the still-active session. Connection retry is explicit and unsuccessful sign-out keeps the workspace visible with an error. Member copy, long labels and modal layouts were also checked at five widths. |
+| Empty chat and team history | Automatic scrolling could move an empty conversation away from its welcome state. Empty chat now starts at the top. Team views default to active members, with an explicit toggle for deactivated accounts instead of a crowded historical list. |
+| Documentation contrast | A mobile style made every drawer heading white, including headings on a light background. White text is now limited to the teal Harbor header; section headings and back arrows use the dark foreground at 5.21:1 contrast. |
+| First-run guidance | The introduction assumed MCP knowledge, the external-client guide led with test harnesses, and member instructions used the administrator's navigation label. Guides now define the components, give observable setup checks and follow the actual role-specific interface. |
+| Permission boundaries | Chat approval could be mistaken for a gateway-wide requirement. The user guide, API reference and security documentation now explicitly distinguish chat confirmations from direct external administrator calls. |
+| Operational guidance | Long sections mixed procedures with duplicated historical results. Maintenance steps now have distinct headings, troubleshooting starts with symptoms, and dated evidence remains in the verification record. Restore guidance explicitly keeps the store bootstrap Job stopped during imports. |
+| Recovery ownership | Manually applied recovery manifests left fields shared with a temporary Kubernetes field manager. A forced Helm conflict resolution did not transfer unchanged fields. A scoped cleanup removed only that temporary manager's entries, preserving resource specifications and content. Normal deployment and the configuration upgrade/rollback drill then passed; deployment defaults are unchanged. |
+| Repository cleanup | Removed an unused private screenshot from `docs/assets` and a dashboard-specific Docker ignore file that the root-context builds never used. Runtime screenshot evidence stays ignored, and documentation publication still rejects unreviewed files. |
+
+The [verification record](verification.md) separates automated regressions, manual presentation checks and real checkout/provider results. The current run also restored both databases and WordPress content from backup into empty volumes before exercising the deployed application.
+
+## Corrected behavior, 15 October 2026
 
 | Area | Finding and correction |
 | --- | --- |
@@ -48,6 +66,6 @@ Source scanning checks for committed private files, known credential values, bro
 
 ## Remaining boundaries
 
-The tested deployment is local and single-node. Public TLS, a VPS deployment, sustained load, browser engines other than Chromium, and restoration from a backup need separate validation. The prior pod replacement and Helm configuration rollback checks do not prove database backup restoration. Free Gemini quota and availability remain external dependencies.
+The tested deployment is local and single-node. Public TLS, a VPS deployment, sustained load and browser engines other than Chromium need separate validation. Backup restoration was exercised locally on 20 October; that result does not establish recovery time or portability to every production environment. Free Gemini quota and availability remain external dependencies.
 
 The application repository remains private. No email delivery, carrier integration or high availability is presented as implemented functionality.

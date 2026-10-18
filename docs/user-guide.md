@@ -77,6 +77,8 @@ Connection status refreshes while the page is visible. Disabling a connection re
 
 Revoke a key in **Team & keys** or **My API keys** when it is no longer needed. Its next request fails, including requests on an initialized MCP transport. An operation that has already been dispatched may still finish. The system also prevents demoting or deactivating the last active administrator.
 
+The team list shows active members by default. Use **Show deactivated members** to inspect or reactivate an earlier account. Keys and invitations also have history controls, so completed records remain available without crowding the active view.
+
 ## Read activity and recover from errors
 
 Use **Activity** to inspect tool calls, their outcome and duration. Members see only their own activity; administrators can inspect all users. Filter by connection or outcome and expand a record for the request ID and error. This audit trail is distinct from conversation history.
