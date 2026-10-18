@@ -75,3 +75,46 @@ foreach (['woocommerce_page_title', 'woocommerce_product_get_image', 'woocommerc
 $starter = new class { public function get_sku() { return 'HARBOR-TOTE-01'; } };
 check(harbor_product_art($starter) === 'https://store.example.test/wp-content/harbor-assets/everyday-tote.svg', 'Starter art must resolve the new SKU and packaged asset path');
 echo "PASS: WooCommerce integration hooks and Harbor product art remain connected\n";
+
+// Exercise the registered checkout filter with WooCommerce's default float precision.
+function wc_get_weight($weight, $unit) { check($unit === 'kg', 'Rates must use kilograms'); return (float)$weight; }
+function wc_format_decimal($value) { return number_format((float)$value, 6, '.', ''); }
+class ShippingRateDouble {
+    public function __construct(public string $method_id, public float $cost) {}
+    public function set_cost($cost) { $this->cost = (float)$cost; }
+}
+$shipping_filter = $filters['woocommerce_package_rates'];
+foreach ([
+    ['standard first band', [['0.5', 1]], 'KA', 59.0],
+    ['remote first band', [['0.5', 1]], 'AS', 99.0],
+    ['started second band', [['0.51', 1]], 'KA', 79.0],
+    ['quantity weight', [['0.5', 3]], 'KA', 99.0],
+    ['default missing weight', [['', 1]], 'KA', 59.0],
+    ['decimal boundary', [['0.4', 1], ['0.8', 1], ['0.3', 1]], 'KA', 99.0],
+    ['remote decimal boundary', [['0.4', 1], ['0.8', 1], ['0.3', 1]], 'AS', 139.0],
+    ['just above boundary', [['1.500001', 1]], 'KA', 119.0],
+] as [$case, $items, $state, $expected]) {
+    $contents = [];
+    foreach ($items as [$weight, $quantity]) {
+        $contents[] = [
+            'data' => new class($weight) {
+                public function __construct(private string $weight) {}
+                public function get_weight() { return $this->weight; }
+            },
+            'quantity' => $quantity,
+        ];
+    }
+    $rates = $shipping_filter(
+        ['flat' => new ShippingRateDouble('flat_rate', 0), 'pickup' => new ShippingRateDouble('local_pickup', 0)],
+        ['contents' => $contents, 'destination' => ['state' => $state]],
+    );
+    check($rates['flat']->cost === $expected, 'Incorrect checkout price: ' . $case);
+    check($rates['pickup']->cost === 0.0, 'Only the sample flat rate may change');
+}
+$free = new ShippingRateDouble('free_shipping', 0);
+$rates = $shipping_filter(
+    ['flat' => new ShippingRateDouble('flat_rate', 59), 'free' => $free],
+    ['contents' => [], 'destination' => ['state' => 'KA']],
+);
+check($rates === ['free' => $free], 'An available free-delivery rate must replace paid rates');
+echo "PASS: checkout rates preserve decimal boundaries, quantities, remote regions and free delivery\n";

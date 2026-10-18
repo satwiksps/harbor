@@ -19,6 +19,9 @@ add_action('wp_head', function () {
     .site-footer{background:#e8e7df;border-top:1px solid var(--harbor-line);color:#58605a;padding:2rem 0}
     .woocommerce-info,.woocommerce-message{background:var(--harbor-teal)}
     input[type=text],input[type=email],input[type=tel],input[type=password],textarea,select{background:#fff;border:1px solid var(--harbor-line);border-radius:4px;box-shadow:none}
+    input[type=checkbox],input[type=radio]{accent-color:var(--harbor-teal)}
+    a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--harbor-teal);outline-offset:2px}
+    input:focus,textarea:focus{outline-color:var(--harbor-teal)}
     .widget-area{display:none}.content-area{width:100%!important;float:none!important;margin-right:0!important}
     .harbor-intro{color:#5a635b;max-width:36rem;margin-inline:auto;text-align:center;font-size:1.1rem}.harbor-demo{background:#e7eeeb;color:#1b5550;padding:.6rem;text-align:center;font-size:.8rem}
     .harbor-product-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;aspect-ratio:1/1;width:100%;background:#eae9e3;border:1px solid var(--harbor-line);border-radius:4px;color:#5a635b;text-align:center}
@@ -29,7 +32,7 @@ add_action('storefront_before_header', function () {
     echo '<div class="harbor-demo">A demonstration store for Harbor. No real payments or deliveries.</div>';
 });
 add_action('woocommerce_archive_description', function () {
-    if (is_shop()) { echo '<p class="harbor-intro">A considered collection for everyday life. Simple essentials, ready for your next chapter.</p>'; }
+    if (is_shop()) { echo '<p class="harbor-intro">Totes, bottles and notebooks for everyday use. Browse the sample catalog or try a demo checkout.</p>'; }
 }, 5);
 add_filter('woocommerce_page_title', function ($title) { return is_shop() ? 'Made for your everyday.' : $title; });
 add_filter('storefront_credit_link', '__return_false');
@@ -79,6 +82,8 @@ add_filter('woocommerce_package_rates', function ($rates, $package) {
     foreach ($package['contents'] as $item) {
         $weight += ((float)wc_get_weight($item['data']->get_weight(), 'kg') ?: 0.5) * (int)$item['quantity'];
     }
+    // Normalize computed floats before ceil: 0.4 + 0.8 + 0.3 must stay in the 1.5 kg band.
+    $weight = (float)wc_format_decimal($weight);
     $remote = in_array($package['destination']['state'] ?? '', ['AN','AR','AS','LD','MN','ML','MZ','NL','SK','TR'], true);
     $cost = ($remote ? 99 : 59) + max(0, ceil(($weight - 0.5) / 0.5)) * 20;
     foreach ($rates as $rate) { if ($rate->method_id === 'flat_rate') { $rate->set_cost($cost); } }

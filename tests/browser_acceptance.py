@@ -7,8 +7,10 @@ Run only against this project's local demonstration cluster.
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
+from decimal import Decimal
 from pathlib import Path
 
 import httpx2
@@ -59,7 +61,11 @@ def structured(call):
     raise AssertionError("Expected a structured tool result")
 
 
-async def verify_order_tools(credentials, order_id):
+async def expect_amount(locator, amount):
+    await expect(locator).to_have_text(re.compile(rf"^\D*{re.escape(amount)}\D*$"))
+
+
+async def verify_order_tools(credentials, order_id, product_id):
     admin, _ = await Acceptance(BASE).login(
         credentials["admin_email"], credentials["admin_password"]
     )
@@ -83,6 +89,13 @@ async def verify_order_tools(credentials, order_id):
             original_data = unpack(original)
             assert original_data["id"] == order_id
             assert "customer@example.test" not in json.dumps(original_data)
+            assert original_data["currency"] == "INR"
+            assert Decimal(original_data["shipping_total"]) == Decimal("59.00")
+            assert Decimal(original_data["total"]) == Decimal("308.00")
+            assert len(original_data["line_items"]) == 1
+            item = original_data["line_items"][0]
+            assert item["product_id"] == product_id and item["quantity"] == 1
+            assert Decimal(item["total"]) == Decimal("249.00")
             changed = await client.call_tool(update, {"order_id": order_id, "status": "on-hold"})
             assert not changed.is_error and unpack(changed)["status"] == "on-hold"
             restored = await client.call_tool(
@@ -119,9 +132,12 @@ async def main(audit_only=False):
             record_video_dir=str(OUT / "video"),
             record_video_size={"width": 1440, "height": 960},
         )
-        page = await context.new_page()
         errors = []
-        page.on("pageerror", lambda error: errors.append(str(error)))
+        context.on(
+            "page",
+            lambda opened: opened.on("pageerror", lambda error: errors.append(str(error))),
+        )
+        page = await context.new_page()
         try:
             await login(page, credentials["admin_email"], credentials["admin_password"])
             if audit_only:
@@ -161,6 +177,7 @@ async def main(audit_only=False):
             product = structured(completed["tool_calls"][0])
             report["product_id"] = product["id"]
             assert product["name"] == name
+            assert Decimal(product["regular_price"]) == Decimal("249.00")
             record("Live Gemini product creation after explicit browser confirmation")
 
             shop = await context.new_page()
@@ -184,6 +201,12 @@ async def main(audit_only=False):
                 await shop.locator("#payment_method_cod").check()
             # Woo recalculates shipping on address changes; wait for its overlay to clear.
             await expect(shop.locator(".blockUI.blockOverlay")).to_have_count(0, timeout=30000)
+            await expect_amount(shop.locator(".cart-subtotal .amount"), "249.00")
+            await expect_amount(
+                shop.locator(".woocommerce-shipping-totals .amount"), "59.00"
+            )
+            await expect_amount(shop.locator(".order-total .amount"), "308.00")
+            record("Checkout shows INR 249 subtotal, INR 59 shipping and INR 308 total")
             await shop.screenshot(path=str(OUT / "checkout.png"), full_page=True)
             await shop.get_by_role("button", name="Place order", exact=True).click()
             await shop.wait_for_url("**/order-received/**", timeout=60000)
@@ -219,8 +242,8 @@ async def main(audit_only=False):
             assert number in answer["message"], "Chat answer omitted the new order"
             await page.screenshot(path=str(OUT / "chat-orders.png"), full_page=True)
             record("Chat today filter returns the actual checkout order")
-            await verify_order_tools(credentials, int(number))
-            record("Get order and update status tools verified against the real order")
+            await verify_order_tools(credentials, int(number), product["id"])
+            record("Saved order amounts, product quantity and status tools match checkout")
             await page.get_by_role("link", name="Activity", exact=True).click()
             await expect(
                 page.get_by_role("table").get_by_text("create_product", exact=False).first
@@ -228,7 +251,7 @@ async def main(audit_only=False):
             await page.screenshot(path=str(OUT / "audit.png"), full_page=True)
             record("Tool activity visible in browser")
             assert not errors, errors
-            record("No dashboard JavaScript exceptions")
+            record("No JavaScript exceptions across dashboard, storefront and store admin")
             report["complete"] = True
         except Exception:
             await page.screenshot(path=str(OUT / "failure.png"), full_page=True)
