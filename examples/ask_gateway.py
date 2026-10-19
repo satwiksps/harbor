@@ -20,6 +20,57 @@ from google.genai import types
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+MAX_MODEL_TOOLS = 40
+MAX_MODEL_DECLARATION_BYTES = 48 * 1024
+
+
+class CatalogError(ValueError):
+    """Safe, locally generated catalog diagnostics suitable for CLI output."""
+
+
+async def read_only_catalog(gateway):
+    tools, seen_names, seen_cursors = {}, set(), set()
+    cursor, catalog_bytes = None, 0
+    for _ in range(100):
+        page = await gateway.list_tools(cursor=cursor)
+        catalog_bytes += len(page.model_dump_json(by_alias=True).encode("utf-8"))
+        if catalog_bytes > 4 * 1024 * 1024:
+            raise CatalogError("Gateway catalog exceeds this example's 4 MiB discovery limit.")
+        for tool in page.tools:
+            if tool.name in seen_names:
+                raise CatalogError("Gateway returned duplicate tool names. Refresh the catalog.")
+            seen_names.add(tool.name)
+            if tool.annotations and tool.annotations.read_only_hint is True:
+                tools[tool.name] = tool
+        cursor = page.next_cursor
+        if cursor is None:
+            return tools
+        if cursor in seen_cursors:
+            raise CatalogError("Gateway repeated a catalog cursor. Refresh the catalog.")
+        seen_cursors.add(cursor)
+    raise CatalogError("Gateway catalog exceeds this example's 100-page discovery limit.")
+
+
+def model_declarations(tools):
+    declarations = [
+        types.FunctionDeclaration(
+            name=tool.name,
+            description=tool.description,
+            parameters_json_schema=tool.input_schema,
+        )
+        for tool in tools.values()
+    ]
+    size = len(json.dumps(
+        [item.model_dump(by_alias=True, exclude_none=True) for item in declarations],
+        ensure_ascii=False, separators=(",", ":"),
+    ).encode("utf-8"))
+    if len(declarations) > MAX_MODEL_TOOLS or size > MAX_MODEL_DECLARATION_BYTES:
+        raise CatalogError(
+            "This example supports at most 40 read-only tools and 48 KiB of model declarations. "
+            "Use Harbor chat's tool discovery or another client with bounded tool selection."
+        )
+    return declarations
+
 
 async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-flash-lite"):
     address = urlsplit(gateway_url)
@@ -50,17 +101,13 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
                 cache=None,
                 read_timeout_seconds=20,
             ) as gateway:
-                catalog = await gateway.list_tools()
                 # This read-only example also refuses write tools if an admin key
                 # is supplied accidentally. The header also enforces this at dispatch
                 # if permissions change while the model is preparing its response.
-                tools = {
-                    tool.name: tool
-                    for tool in catalog.tools
-                    if tool.annotations and tool.annotations.read_only_hint is True
-                }
+                tools = await read_only_catalog(gateway)
                 if not tools:
                     raise ValueError("The gateway did not expose any read-only tools")
+                declarations = model_declarations(tools)
                 config = types.GenerateContentConfig(
                     system_instruction=(
                         "Answer commerce questions with the supplied gateway tools. Use actual results, "
@@ -71,14 +118,7 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
                     ),
                     tools=[
                         types.Tool(
-                            function_declarations=[
-                                types.FunctionDeclaration(
-                                    name=tool.name,
-                                    description=tool.description,
-                                    parameters_json_schema=tool.input_schema,
-                                )
-                                for tool in tools.values()
-                            ]
+                            function_declarations=declarations
                         )
                     ],
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
@@ -172,6 +212,8 @@ def main():
             "error": type(exc).__name__,
             "provider_status": getattr(exc, "code", None),
         }
+        if isinstance(exc, CatalogError):
+            result["detail"] = str(exc)
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["passed"] else 1
 

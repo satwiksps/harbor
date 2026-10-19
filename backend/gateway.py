@@ -16,6 +16,7 @@ from mcp.server.caching import CacheHint
 from mcp.server.transport_security import TransportSecuritySettings
 from sqlalchemy import select
 
+from backend.catalog import CatalogEntry
 from backend.models import Audit, Upstream, now, uid
 from backend.network import SafeTransport, validate_url
 from backend.security import refresh_principal
@@ -109,6 +110,10 @@ class Gateway:
                 yield client, credential
 
     def list_for(self, principal):
+        return [entry.tool for entry in self.catalog_for(principal)]
+
+    def catalog_for(self, principal):
+        """Keep each permitted schema and its execution binding in one snapshot."""
         tools = []
         with self.db.session() as session:
             upstreams = session.scalars(select(Upstream).where(Upstream.enabled.is_(True))).all()
@@ -123,8 +128,10 @@ class Gateway:
                         **(value.get("annotations") or {}),
                         "readOnlyHint": upstream.permissions.get(tool["name"]) == "read",
                     }
-                    tools.append(types.Tool.model_validate(value))
-        return sorted(tools, key=lambda tool: tool.name)
+                    tools.append(CatalogEntry(
+                        types.Tool.model_validate(value), target_hash(upstream, tool)
+                    ))
+        return sorted(tools, key=lambda entry: entry.tool.name)
 
     def lookup(self, name):
         with self.db.session() as session:

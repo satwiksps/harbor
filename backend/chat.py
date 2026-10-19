@@ -12,9 +12,10 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy import select
 
+from backend.catalog import SEARCH_NAME, ChatCatalog
 from backend.gateway import allowed
 from backend.models import Confirmation, now
-from backend.security import delegate
+from backend.security import delegate, refresh_principal
 from backend.tool_safety import target_hash
 
 logger = logging.getLogger(__name__)
@@ -94,15 +95,7 @@ class ChatAgent:
             )
         if not principal.session_id:
             raise HTTPException(401, "Chat requires a dashboard session")
-        tools = self.gateway.list_for(principal)
-        declarations = [
-            genai_types.FunctionDeclaration(
-                name=t.name,
-                description=(t.description or "")[:4000],
-                parameters_json_schema=t.input_schema,
-            )
-            for t in tools
-        ]
+        catalog = ChatCatalog(self.gateway.catalog_for(principal))
         config = genai_types.GenerateContentConfig(
             system_instruction=(
                 "You are Harbor, the team's commerce assistant. "
@@ -112,9 +105,11 @@ class ChatAgent:
                 "Never use an em dash character in responses. "
                 "Use Asia/Kolkata for 'today', unless the user requests another timezone. "
                 "The server requires confirmation before write operations. Clearly explain errors. "
+                "If harbor_search_tools is available, search for the task and server first, then "
+                "call an enabled tool on the next turn. Search again to change the selected tools. "
+                "Never guess a tool's arguments or bypass a tool that is unavailable for chat. "
                 f"Current UTC timestamp: {now().isoformat()}Z. User role: {principal.role}."
             ),
-            tools=[genai_types.Tool(function_declarations=declarations)] if declarations else None,
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
             temperature=0.1,
             max_output_tokens=2048,
@@ -128,6 +123,7 @@ class ChatAgent:
             for m in messages
         ]
         calls = []
+        function_count = 0
         try:
             async with asyncio.timeout(self.settings.chat_timeout_seconds), self.slots:
                 async with genai.Client(
@@ -138,6 +134,14 @@ class ChatAgent:
                     ),
                 ).aio as client:
                     for _ in range(8):
+                        principal = refresh_principal(self.db, principal)
+                        catalog.reconcile(self.gateway.catalog_for(principal))
+                        declarations = catalog.declarations()
+                        config.tools = (
+                            [genai_types.Tool(function_declarations=declarations)]
+                            if declarations else None
+                        )
+                        declared = dict(catalog.active)
                         response = await client.models.generate_content(
                             model=self.settings.gemini_model, contents=contents, config=config
                         )
@@ -158,24 +162,46 @@ class ChatAgent:
                         contents.append(content)
                         replies = []
                         for function in functions:
-                            if len(calls) >= 12:
+                            if function_count >= 12:
                                 raise HTTPException(
                                     422, "Tool call limit reached. Narrow the request."
                                 )
+                            function_count += 1
                             arguments = dict(function.args or {})
+                            principal = refresh_principal(self.db, principal)
+                            if catalog.progressive and function.name == SEARCH_NAME:
+                                discovery = catalog.search(
+                                    self.gateway.catalog_for(principal), arguments
+                                )
+                                replies.append(genai_types.Part.from_function_response(
+                                    name=SEARCH_NAME, response=discovery
+                                ))
+                                continue
+                            selected = declared.get(function.name)
                             upstream, tool = self.gateway.lookup(function.name)
                             if (
-                                upstream
-                                and upstream.enabled
-                                and allowed(principal, upstream, tool["name"])
-                                and upstream.permissions.get(tool["name"], "write") != "read"
+                                not selected or not upstream or not upstream.enabled
+                                or not allowed(principal, upstream, tool["name"])
+                                or selected.target_hash != target_hash(upstream, tool)
+                            ):
+                                catalog.active.pop(function.name, None)
+                                replies.append(genai_types.Part.from_function_response(
+                                    name=function.name,
+                                    response={"error": (
+                                        "Tool was not selected, changed, or is no longer permitted. "
+                                        "Search again if discovery is available; otherwise start a new request."
+                                    )},
+                                ))
+                                continue
+                            if (
+                                upstream.permissions.get(tool["name"], "write") != "read"
                             ):
                                 with self.db.session() as session:
                                     pending = Confirmation(
                                         user_id=principal.id,
                                         session_id=principal.session_id,
                                         tool_name=function.name,
-                                        target_hash=target_hash(upstream, tool),
+                                        target_hash=selected.target_hash,
                                         arguments=arguments,
                                         expires_at=now() + timedelta(minutes=5),
                                     )
@@ -196,7 +222,7 @@ class ChatAgent:
                                 principal,
                                 function.name,
                                 arguments,
-                                expected_target=target_hash(upstream, tool),
+                                expected_target=selected.target_hash,
                                 require_read=True,
                             )
                             calls.append(result)
