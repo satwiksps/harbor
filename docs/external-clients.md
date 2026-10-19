@@ -57,6 +57,8 @@ After disabling a connection or changing permissions, refresh the catalog or rec
 
 The private repository includes `examples/ask_gateway.py`, a standalone client using the official MCP and Google Gen AI SDKs. It imports no backend code and discovers tools over HTTP. The model can use only those tools, with no shell, filesystem, browser or direct upstream access.
 
+The client follows MCP pagination instead of stopping after the first 100 tools. Its simple model adapter accepts at most 40 read-only tools and 48 KiB of complete function declarations. Larger catalogs produce a clear error before any model request; use Harbor chat's [bounded tool discovery](system-design.md#large-tool-catalogs-in-chat) or another client with its own selection strategy. Discovery itself stops on repeated cursors, duplicate names, more than 100 pages or more than 4 MiB of catalog data.
+
 Run `uv sync --frozen` first. Use the member's gateway key and your Gemini provider key. They serve different purposes: the gateway key identifies your Harbor account; the provider key authorizes the model request.
 
 These PowerShell commands keep the gateway secret out of command history and clear credential environment variables even if the agent fails:

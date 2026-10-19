@@ -34,7 +34,7 @@ Set-Location ..
 
 Helm is installed under `.tools` by bootstrap or `scripts/install-tools.ps1`. The frontend build type-checks before bundling. Its font preparation step downloads Switzer on a fresh installation; [visual provenance](brand-notes.md) documents the font source and licensing.
 
-The PostgreSQL concurrency cases need `TEST_POSTGRES_URL` pointing to a disposable PostgreSQL database. They are skipped when that variable is absent. CI supplies a dedicated PostgreSQL service. Do not point test fixtures at the deployed application's database. Linux-specific schema memory checks run on Linux; Windows checks still exercise input and deadline guards.
+The PostgreSQL concurrency and activity-aggregation cases need `TEST_POSTGRES_URL` pointing to a disposable PostgreSQL database. They are skipped when that variable is absent. CI supplies a dedicated PostgreSQL service. Do not point test fixtures at the deployed application's database. Linux-specific schema memory checks run on Linux; Windows checks still exercise input and deadline guards.
 
 ## Work on the dashboard
 
@@ -77,10 +77,11 @@ For accessibility checks with browser-local API fixtures:
 ```powershell
 $env:HARBOR_URL = 'http://harbor.localhost:8080'
 uv run python -m tests.browser_accessibility
+uv run python -m tests.browser_observability
 Remove-Item Env:HARBOR_URL
 ```
 
-This harness can also target a running frontend preview. It does not send application mutations or provider requests.
+These harnesses can also target a running frontend preview. They do not send application mutations or provider requests. The Activity checks cover metrics, filtering, personal scope and failure recovery.
 
 The following checks use a live Gemini API key and consume quota. The browser acceptance flow also submits a real test checkout:
 
@@ -99,7 +100,7 @@ The [verification record](verification.md) lists executed checks, their environm
 
 ## CI and scope
 
-The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL concurrency cases, recovery and credential-preparation guards, and the dashboard build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
+The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL cases, recovery and credential-preparation guards, the dashboard build, and Activity/accessibility browser fixtures against that build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
 
 The system deliberately uses one store, one gateway replica and process-local rate limits. Public deployment requires TLS, secure cookies, cluster Secret encryption and protected backups. Production values are a template; they do not demonstrate a deployed VPS. Schema migrations are forward-only until an explicit rollback migration exists.
 

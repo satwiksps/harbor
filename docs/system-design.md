@@ -54,6 +54,16 @@ The chat loop disables automatic SDK function execution. It presents permitted t
 
 The confirmation flow is part of dashboard chat. External administrator clients may invoke write tools directly. Member keys remain limited to tools the administrator has classified as read operations.
 
+### Large tool catalogs in chat
+
+Small catalogs go directly to Gemini. If the permitted catalog exceeds 40 tools or 48 KiB of serialized function declarations, chat starts with one internal `harbor_search_tools` function. These are Harbor's application budgets, not Gemini's advertised limits.
+
+Search ranks the permitted tool names, server names and descriptions locally. It returns at most five matches and enables their complete schemas for the next model round. A new search replaces the selection; pagination and query refinement let the model reach later tools without accumulating the whole catalog. A schema that cannot fit is reported explicitly and remains unavailable in chat. It is never truncated to make execution possible.
+
+Every selected schema is bound to its upstream revision, destination and permissions. Chat refreshes the identity before discovery and execution, rejects changed targets, and keeps the same write-confirmation flow. Search requests share the existing 12-function-call and eight-round limits. Discovery inspects a catalog; only actual gateway calls create tool-execution audit records.
+
+External MCP clients still receive the ordinary tool list, paginated at 100 entries, and invoke the original public aliases. They control their own model context. The standalone reference agent follows all pages but reports an explicit error above its smaller 40-tool/48-KiB model budget.
+
 ## Discovery, routing and failures
 
 Public tool names combine an immutable server slug, a readable original tool name and a short hash of the original name. Discovery rejects a catalogue if two original names still produce the same alias. The mapping is resolved explicitly; the gateway does not trust a client-supplied destination URL. Aliases fit within 60 characters. The policies and shipping services both expose `search`, providing a real collision example. JSON Schema validation has no remote or filesystem reference resolver; only in-document references are permitted.
@@ -88,7 +98,7 @@ Prices remain decimal strings and Python Decimal values. The sample store uses I
 
 ## Local and production
 
-Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production deployment uses images pushed to a registry accessible to the target k3s machine. The public VPS deployment is not implied by local verification.
+Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production images can come from an accessible private registry or be built and imported directly on a single k3s node. The public VPS deployment is not implied by local verification.
 
 One replica per component is intentional. PostgreSQL and MariaDB are not HA, local-path volumes are node-local, in-process rate limits are not distributed, and the gateway is not horizontally scaled. These are documented limits of a small single-node deployment. Redis, queues, a service mesh and a custom operator would add operational cost beyond the needs of this scope.
 

@@ -81,13 +81,19 @@ The team list shows active members by default. Use **Show deactivated members** 
 
 ## Read activity and recover from errors
 
-Use **Activity** to inspect tool calls, their outcome and duration. Members see only their own activity; administrators can inspect all users. Filter by connection or outcome and expand a record for the request ID and error. This audit trail is distinct from conversation history.
+Use **Activity** to inspect tool calls, their outcomes and performance. Members see only their own activity; administrators can inspect the team or select a teammate. Connection and teammate filters apply to both the overview and history.
+
+The overview shows calls started within the last hour, 24 hours or seven days. It reports call counts, failure rate, median and p95 latency, with a breakdown by connection and outcome. **Refresh** updates both sections; the overview shows when it was measured. The history remains all time, and its outcome filter does not change the overview. Open **Details** for a call's request ID and error.
+
+Failure rate counts connection errors, tool errors and timeouts out of completed calls, including successes. Denied, invalid, cancelled and in-progress calls count toward total activity but not failure rate or latency. Latency measures the gateway call, including waiting, connection setup and execution. It is not the upstream server's processing time alone. Sample counts show how many calls contributed; small samples can vary widely. **No data** means no eligible measurement, while an in-progress call has no final duration yet. This audit trail is separate from conversation history.
 
 | What you see | What to do |
 | --- | --- |
 | Chat is not configured | Ask the operator to configure the provider key; connections and external MCP remain available |
 | Provider quota or timeout error | Wait or try a smaller read; check store state before repeating a write |
 | Connection is Unreachable | Inspect its error and check the service; other connections can still work |
+| Activity overview is unavailable | Use **Try again**; the history can remain available while summary metrics are unavailable |
+| No calls in this window | Choose a longer window or change your filters |
 | Approval expired or the tool changed | Make a new request and review a fresh proposal |
 | Key was revoked or the session expired | Sign in again or create a new permitted key |
 

@@ -28,6 +28,7 @@ PUBLIC_DOCS = {
     "requirements.in",
     "requirements.txt",
     "robots.txt",
+    "assets/application-release-evidence.json",
     "assets/external-agent-evidence.json",
     "assets/mark.svg",
     "stylesheets/extra.css",

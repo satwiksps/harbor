@@ -95,9 +95,19 @@ The tested store image pins WordPress 7.1.3, PHP 8.3, WooCommerce 11.2.1, Storef
 
 No public VPS deployment is claimed. These steps describe the production-like target using the same chart. The server needs sufficient memory, disk space, inbound TCP 80/443, and a private administration path. Restrict port 6443 to operators. Do not expose database or upstream ports.
 
+### Oracle Always Free preparation
+
+On 20 October 2026, the account was verified as Free Tier with no paid upgrade enabled. The prepared target was one `VM.Standard.A1.Flex` instance in its home region, Ubuntu 24.04 Arm, 2 OCPUs, 12 GB RAM and a 100 GB boot volume. Oracle rejected the launch because the region had no available Arm capacity. This is a prepared deployment, not a running public service.
+
+Oracle currently includes 1,500 A1 OCPU hours, 9,000 GB memory hours and 200 GB combined boot/block storage each month in the home region. This single-instance configuration fits those limits. The time-limited trial credits are separate. Keep the account on Free Tier, check the tenancy's existing allocations before creating resources, and do not select a paid shape as a capacity workaround. The console's raw storage estimate does not apply every free allowance. See [Oracle's current limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [trial expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
+
+Always Free capacity is not guaranteed, and Oracle may reclaim idle instances. Keep an off-node backup and treat this as a demonstration host. An Arm VM needs Arm-compatible images: build on the VM or explicitly build for `linux/arm64`. The source and container images can remain private by transferring a reviewed source archive over SSH, building on the VM, and importing images into k3s.
+
+### Install and configure k3s
+
 1. Install a supported k3s version with Traefik, local-path storage, the network-policy controller, and `--secrets-encryption`. The locally tested version is `v1.35.5+k3s1`. Follow the [official k3s installation guide](https://docs.k3s.io/quick-start); inspect and pin installer inputs for your environment. Keep Secret encryption keys and the cluster token in a protected backup.
-2. Point two DNS names to the server. Provision a certificate and a TLS Secret or install cert-manager separately. TLS is required for real credentials on a public deployment.
-3. Build the three Dockerfiles, tag them with a release version, push to a registry the node can pull, and replace every `REPLACE_OWNER` image in `deploy/values-prod.yaml`. Public images avoid a registry credential; private images require an image-pull Secret and `imagePullSecrets: [{name: registry-credentials}]` in the private values file.
+2. Point two DNS names to the server. Provision a certificate and a TLS Secret or install cert-manager separately. TLS is required for real credentials on a public deployment. Configure Traefik to redirect HTTP to HTTPS. If using cert-manager's HTTP-01 challenge, explicitly allow Traefik to reach its solver pods through the namespace's default-deny NetworkPolicy, including during renewal. Merely setting `ingress.tls` does not issue a certificate or create a redirect.
+3. Build the three Dockerfiles, tag them with a release version, and replace every `REPLACE_OWNER` image in `deploy/values-prod.yaml`. Application images contain source code. Keep the registry private and configure an image-pull Secret with `imagePullSecrets: [{name: registry-credentials}]`, or import the images directly into containerd on a single-node host. Use images built for that host's CPU architecture.
 4. Copy `deploy/values-prod.yaml` to a private values file. Set both hosts, both full public URLs, the TLS Secret, administrator identity, storage class and sizes. Set `networkPolicy.apiServerCidr` to the Kubernetes Service IP `/32` and `apiServerNodeCidr` to the control-plane internal IP `/32`. Default k3s uses `10.43.0.1/32` for the API Service, but verify rather than assuming. Set `gateway.trustedProxyCidrs` to only the pod CIDRs of the nodes running Traefik. The one-node default is `10.42.0.0/24`; verify it against the actual node. Keep `gateway.secureCookies: true` and `networkPolicy.enabled: true`.
 
 Example discovery commands:
@@ -190,6 +200,35 @@ kubectl -n harbor exec deployment/wordpress -- tar -czf - -C /var/www/html wp-co
 Upgrade immutable image references and review rendered changes before applying. Database engine upgrades require their own supported migration procedure. A Helm rollback changes manifests and image versions; it does not reverse database schema changes, restore deleted orders, or revert PVC contents.
 
 For the local acceptance scenario, `uv run python scripts/verify_release.py` records non-sensitive user/product/order IDs and PVC identities, restarts WordPress and both database pods, and checks that those records persist. It then changes only the gateway CPU limit through a new Helm revision, rolls back to the compatible revision it started from, and checks the original configuration and records. This deliberately uses unchanged image tags and proves configuration rollback, not old application-binary or database recovery. Run it only while other clients are idle.
+
+#### Demonstrate an application version upgrade and rollback
+
+`scripts/verify_application_release.py` performs a separate A → B → A drill on an explicitly selected isolated release. Provision that release with its own namespace, Secrets, PostgreSQL, MariaDB, WordPress and PVCs. Use separate console/store hostnames and seed an administrator, a member, products and an order. Never label the normal demo or a production namespace as the drill target. The script does not create or delete environments.
+
+Build A from the known baseline source and B from the completed feature source, using distinct version tags or registry digests for both the shared gateway/upstream image and dashboard image. For the observability change, the baseline source is `d5614f9`. Install A using the same chart and values the drill will use for B. Keep the database models and migration code identical. Build sequentially on small hosts; a second namespace still needs independent data workloads and volumes.
+
+Create a private JSON credential file containing `admin_email`, `admin_password`, `member_email` and `member_password` for this isolated release. Keep the exact source checkout used to build B available to `--candidate-source`. The script checks A's running schema source against that checkout before any mutation, and checks B's running application source against it after deployment.
+
+```sh
+# Label only the already-provisioned, disposable verification namespace.
+kubectl --context k3d-harbor-release label namespace harbor-release \
+  harbor.local/release-verification=isolated
+
+# Read-only preflight. Replace every example target and image with your prepared values.
+uv run python scripts/verify_application_release.py \
+  --context k3d-harbor-release --namespace harbor-release --release harbor-release \
+  --base http://release.localhost:8080 \
+  --a-app harbor:a-d5614f9 --a-dashboard harbor-dashboard:a-d5614f9 \
+  --b-app harbor:b-observability-v1 --b-dashboard harbor-dashboard:b-observability-v1 \
+  --candidate-source . --credentials .secrets/release-drill.json \
+  --report .runtime/application-release.json
+```
+
+Repeat that command with `--execute` to run the drill while the isolated store is idle. Its Helm upgrade changes only the five application container images; preflight rejects any other rendered resource change. Hooks are disabled, so WordPress bootstrap does not run again. Kubernetes readiness, direct readiness endpoints, exact runtime `imageID` values and application payload hashes are recorded for each stage. Changing only an image tag or OCI metadata fails the check.
+
+The same two temporary personal keys and browser sessions must work at A, B and restored A. Each stage checks member write denial, administrator/member discovery, and real read calls through all three upstreams. It compares user roles, registry permission fingerprints, Alembic versions, product/order content fingerprints, the privacy notice, retained PVC UIDs and bound volume names. The data pods must remain unchanged. Customer data, passwords and tokens are excluded from the report.
+
+Once an upgrade is attempted, the script attempts rollback in `finally`, including after a failed Helm upgrade or failed B checks, then revokes its temporary keys and sessions. It writes failure evidence even when recovery fails and exits nonzero; inspect `rollback_verified` before treating a failed drill as recovered. Forced process termination or host loss cannot execute cleanup. Preserve the isolated environment and report for diagnosis in that case. A passed result proves compatible application binaries were replaced and restored with retained data; it does not demonstrate a database downgrade or backup restoration. Completed runs belong in the [verification record](verification.md) with their actual image identities and timestamps.
 
 ```sh
 helm history harbor -n harbor

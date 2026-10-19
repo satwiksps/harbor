@@ -1,0 +1,137 @@
+{
+  "format_version": 1,
+  "scope": "Compatible application binaries A -> B -> A; no database restore",
+  "status": "passed",
+  "started_at_utc": "2026-10-20T15:42:53Z",
+  "finished_at_utc": "2026-10-20T15:43:49Z",
+  "source_commits": {
+    "A": "d5614f9a6cf6bc1b3f638049481f39125a46b6f6",
+    "B": "1757655f0ee34e628fd6d8d6fc65dd7cb4eadb64"
+  },
+  "application_workloads": [
+    "gateway",
+    "woo-mcp",
+    "policies-mcp",
+    "shipping-mcp"
+  ],
+  "payload_hash_method": {
+    "application": "SHA-256 of sorted JSON mapping backend/upstreams Python paths to LF-normalized file SHA-256 values; verified against each source commit.",
+    "dashboard": "SHA-256 of sorted sha256sum output for every dashboard document-root file."
+  },
+  "stages": [
+    {
+      "stage": "A",
+      "helm_revision": 1,
+      "source_version": "A",
+      "schema_versions": [
+        "0003"
+      ],
+      "schema_sha256": "a77623304d58f1d89a77ed866a72270e91a6848d137077a3d7f69e436c4e99d6",
+      "ready_workloads": 8,
+      "counts": {
+        "users": 2,
+        "products": 3,
+        "orders": 1,
+        "pvcs": 3
+      },
+      "application": {
+        "image": "harbor:release-a-d5614f9a6cf6",
+        "image_ids": [
+          "sha256:d23585430e2b03c1ce7513cb474d3f3040dcfae3e804cb2713bf9983692106af"
+        ],
+        "payload_sha256": "4390b92eec92ee0395eb4f44adec233ac1e5e4768b4c5554027847e71e6f4598"
+      },
+      "dashboard": {
+        "image": "harbor-dashboard:release-a-d5614f9a6cf6",
+        "image_ids": [
+          "sha256:63ca71230992a48f20fe7b330d2a17788bcea4658b4b7b4d157631622b304ec5"
+        ],
+        "payload_sha256": "0b3539049a297338f7860a94a4261fb9e58a926dfbc21a46b2f318d6440c348b"
+      }
+    },
+    {
+      "stage": "B",
+      "helm_revision": 2,
+      "source_version": "B",
+      "schema_versions": [
+        "0003"
+      ],
+      "schema_sha256": "a77623304d58f1d89a77ed866a72270e91a6848d137077a3d7f69e436c4e99d6",
+      "ready_workloads": 8,
+      "counts": {
+        "users": 2,
+        "products": 3,
+        "orders": 1,
+        "pvcs": 3
+      },
+      "application": {
+        "image": "harbor:release-b-1757655f-62f99078b494",
+        "image_ids": [
+          "sha256:a59b3493147fc2de0e699fc7b5199f18a02d1f74ed7dc3d8ddc5eb04d2de5b9c"
+        ],
+        "payload_sha256": "62f99078b4943ed4a82751d3d936e94dafb8ee8c489fe89ff031a1fc801a0552"
+      },
+      "dashboard": {
+        "image": "harbor-dashboard:release-b-1757655f-62f99078b494",
+        "image_ids": [
+          "sha256:0aef06a577b9ad6e2b88c3fd58d75a17778889161fb44f208c1a65fb5d9c0d78"
+        ],
+        "payload_sha256": "0457ca2b1a6cbe543c40ba877e6e091a27bbbef0c763fd9cb26c495386afc5cc"
+      }
+    },
+    {
+      "stage": "A_restored",
+      "helm_revision": 3,
+      "source_version": "A",
+      "schema_versions": [
+        "0003"
+      ],
+      "schema_sha256": "a77623304d58f1d89a77ed866a72270e91a6848d137077a3d7f69e436c4e99d6",
+      "ready_workloads": 8,
+      "counts": {
+        "users": 2,
+        "products": 3,
+        "orders": 1,
+        "pvcs": 3
+      },
+      "application": {
+        "image": "harbor:release-a-d5614f9a6cf6",
+        "image_ids": [
+          "sha256:d23585430e2b03c1ce7513cb474d3f3040dcfae3e804cb2713bf9983692106af"
+        ],
+        "payload_sha256": "4390b92eec92ee0395eb4f44adec233ac1e5e4768b4c5554027847e71e6f4598"
+      },
+      "dashboard": {
+        "image": "harbor-dashboard:release-a-d5614f9a6cf6",
+        "image_ids": [
+          "sha256:63ca71230992a48f20fe7b330d2a17788bcea4658b4b7b4d157631622b304ec5"
+        ],
+        "payload_sha256": "0b3539049a297338f7860a94a4261fb9e58a926dfbc21a46b2f318d6440c348b"
+      }
+    }
+  ],
+  "checks": {
+    "upgrade_verified": true,
+    "rollback_verified": true,
+    "image_only_chart_change": true,
+    "all_eight_workloads_ready_at_each_stage": true,
+    "application_payloads_match_source_commits": true,
+    "all_five_application_image_ids_and_payloads_changed_on_upgrade": true,
+    "all_five_application_image_ids_and_payloads_restored_on_rollback": true,
+    "schema_unchanged": true,
+    "users_roles_and_active_states_preserved": true,
+    "upstream_registry_and_permissions_preserved": true,
+    "product_order_and_store_snapshots_preserved": true,
+    "pvc_identity_volume_capacity_and_retention_preserved": true,
+    "data_workload_pods_unchanged": true,
+    "existing_sessions_valid_at_each_stage": true,
+    "existing_api_keys_valid_at_each_stage": true,
+    "member_admin_api_denied_at_each_stage": true,
+    "member_direct_write_denied_at_each_stage": true,
+    "admin_write_tool_hidden_from_member_at_each_stage": true,
+    "permission_filtered_tool_lists_preserved": true,
+    "mcp_read_result_hashes_preserved": true,
+    "original_release_restored_ready": true,
+    "original_data_and_pvcs_preserved": true
+  }
+}

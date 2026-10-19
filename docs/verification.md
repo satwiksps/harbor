@@ -1,8 +1,42 @@
 # Verification record
 
-This page records completed checks against the local k3d deployment. Results apply to the dated run and source state, not every future installation. The [development guide](development.md) gives the recommended commands and prerequisites for a new run.
+This page records completed source, browser fixture and local k3d checks. Results apply to the dated run and source state, not every future installation. The [development guide](development.md) gives the recommended commands and prerequisites for a new run.
 
 Unit tests, fixture-driven browser regressions and live end-to-end checks establish different things. A passing fixture check does not prove that Gemini, checkout or a restored database works. Live checks use synthetic data; only checks that call Gemini consume provider quota.
+
+## Large tool catalogs, 20 October 2026
+
+The complete Windows regression suite passed 202 tests, with three PostgreSQL cases and one Linux-only memory case skipped. The separate disposable PostgreSQL run passed 15 tests. The 24 focused catalog cases cover a 500-tool catalog across ten synthetic server records, all five MCP listing pages, selected-tool execution through MCP, byte/count limits, oversize schemas, pagination failures, permission changes, target changes, revoked sessions and write confirmation.
+
+In that fixture, complete function declarations occupied 90,516 bytes. Progressive discovery began with 577 bytes and used 773 bytes after selecting the target schema. This measures serialized declarations, not provider tokens or an end-to-end performance benchmark. Independent review also checked numeric argument normalization and pagination limits.
+
+Two spaced real Gemini attempts against the synthetic catalog received provider HTTP 503 on the initial search request. A separate minimal request without tools received the same error, confirming that this run was blocked by provider availability. The application returned its sanitized error without dispatching a tool. Live large-catalog model completion is therefore not claimed by this run.
+
+## Activity observability, 20 October 2026
+
+| Check | Observed result |
+| --- | --- |
+| Backend regressions | 107 passed, covering existing behavior and the new summary contract |
+| Disposable PostgreSQL checks | 15 passed, including aggregate percentile parity; the temporary database and port forward were cleaned up |
+| Focused Activity browser fixtures | All ten `tests.browser_observability` checks passed: scope, outcome distinctions, denominator stability, shared filters, empty values, failed refresh recovery, request details, pending duration, responsive layout and 4.5:1 text contrast |
+| Existing accessibility fixtures | `tests.browser_accessibility` passed at 320, 390, 430, 768 and 1440 px with no JavaScript exceptions or unexpected API requests |
+| Frontend validation | TypeScript checking and the production bundle passed |
+
+The Activity fixture harness intercepts authentication and API responses, uses no provider quota and needs no running backend. Set `HARBOR_URL` to a dashboard development server or preview and run `uv run python -m tests.browser_observability`. Screenshots and its scoped report stay under ignored `.runtime/observability`.
+
+After deploying the tested application images to the normal local release as revision 9, `tests.acceptance` passed all 14 checks. Real calls reached all three upstreams. The summary's counts and latency samples matched the recorded calls; an administrator's member filter matched that member's personal summary, and a forged teammate filter could not widen the member's view. This run omitted Gemini requests because the provider was unavailable.
+
+The deployed browser regression passed all nine checks, and invitation/account switching passed all eight. A separate Activity inspection passed seven checks using real authentication and API responses, with no interception. The 1h, 24h and 7d windows, connection and teammate filters, outcome-independent summaries and persisted call details worked. Desktop and mobile layouts at 1440, 390 and 320 px had no document-wide overflow or JavaScript errors. Inspection sessions and browsers were closed afterward.
+
+## Application upgrade and rollback, 20 October 2026
+
+An isolated release ran source version `d5614f9` as A, upgraded to the observability and tool-discovery source `1757655` as B, then rolled back to A. The three stages used Helm revisions 1, 2 and 3. Fresh application and dashboard images were built from each source version. Runtime image IDs and hashes of the deployed files confirmed that B contained different code and that rollback restored the exact A payloads.
+
+All stages preserved users and roles, registry permissions, existing sessions and API keys, MCP read results, product/order fingerprints, the privacy notice and all three PVC identities. Member write tools stayed hidden and direct write attempts were rejected. The schema stayed at `0003`; this proves a compatible application rollback, not reversal of a database migration.
+
+The normal local release was backed up and paused to limit memory use. A temporary orchestration error before the isolated installation exercised its recovery path; the original release and data were restored. The resumed drill passed, paused the isolated workloads and again verified the original release's readiness and unchanged data before the tested images were promoted.
+
+The [sanitized release evidence](assets/application-release-evidence.json) records version hashes and preservation checks. Detailed private reports remain under `.runtime`. The [operations guide](operations.md#demonstrate-an-application-version-upgrade-and-rollback) explains how to prepare an isolated target and repeat the drill.
 
 ## Reliability review, 20 October 2026
 

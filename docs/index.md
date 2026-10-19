@@ -35,8 +35,9 @@ The React and TypeScript dashboard, Python gateway, three MCP servers and storef
 
 - A dynamic server registry with collision-safe tool names, cached discovery, isolated timeouts and credentials stored in Kubernetes Secrets.
 - Invitations, administrator and member roles, individually hashed API keys, immediate revocation and per-tool role permissions.
-- Gemini chat that calls the gateway as the signed-in user, shows tool results and asks for confirmation before a write.
-- An attributable audit trail, SSRF protection, network isolation and least-privilege Kubernetes RBAC.
+- Gemini chat with bounded discovery for large catalogs, calls under the signed-in user's identity and confirmation before a write.
+- Activity history and per-connection counts, failure rates, median and p95 latency, scoped to the viewer's access.
+- SSRF protection, network isolation and least-privilege Kubernetes RBAC.
 - One Helm chart with local and production values, repeatable bootstrap, backup scripts and CI checks.
 
 ## Scope and evidence

@@ -104,6 +104,28 @@ Key records contain `id`, `name`, `prefix`, `user_id`, `created_at`, `last_used_
 
 Members always see only their own records. Entries include the originating user, server and tool names, timestamp, duration, outcome, error and request ID.
 
+`GET /api/audit/summary` aggregates the same audit trail without pagination or an outcome filter:
+
+| Query parameter | Meaning |
+| --- | --- |
+| `window` | `1h`, `24h` or `7d`; defaults to `24h` |
+| `server_id` | Optional upstream ID, at most 36 characters |
+| `user_id` | Optional administrator user filter, at most 36 characters; members remain scoped to themselves |
+
+The response contains `window`, UTC `from` and `to`, `scope` (`team` or `self`), effective `user_id`, selected `server_id`, `totals` and `servers`. The window includes calls whose start timestamp is at or after `from` and before `to`. Only connections with matching calls appear in `servers`. Each group includes `server_id`, `server_name`, `server_deleted` and the same metrics as `totals`:
+
+| Metric | Meaning |
+| --- | --- |
+| `calls`, `outcomes` | Total attempts and counts for `success`, `tool_error`, `error`, `timeout`, `pending`, `denied`, `invalid_arguments`, `cancelled` and `other` |
+| `completed_calls`, `failed_calls` | Completed outcomes are success, tool error, connection error and timeout; failures exclude success |
+| `failure_rate` | `failed_calls / completed_calls`, from 0 to 1; `null` with no completed calls |
+| `latency_samples` | Completed calls with a recorded non-negative duration |
+| `p50_latency_ms`, `p95_latency_ms` | Linearly interpolated percentiles of those durations; `null` with no samples |
+
+Latency covers the gateway call, including queueing, connection setup and tool execution, rather than upstream processing alone. Denied, invalid, cancelled, pending and unknown outcomes do not enter the failure denominator or latency population. Overall percentiles use all eligible observations, not an average of connection percentiles.
+
+Groups retain their stable upstream IDs through renames and deletion. A current registration supplies its name; a removed registration uses its latest matching audit name and sets `server_deleted`. A null ID forms an `Unattributed` group. A query with no matching calls returns zero calls with null rate and latency. Missing authentication returns `401`, invalid parameters return `422`, and a database failure returns sanitized `503` detail with `Retry-After: 1`.
+
 `POST /api/chat` accepts:
 
 ```json
