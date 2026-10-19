@@ -67,6 +67,31 @@ export interface Audit {
   error?: string;
   request_id: string;
 }
+export type AuditWindow = "1h" | "24h" | "7d";
+export interface AuditMetrics {
+  calls: number;
+  completed_calls: number;
+  failed_calls: number;
+  failure_rate: number | null;
+  latency_samples: number;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  outcomes: Record<string, number>;
+}
+export interface AuditSummary {
+  window: AuditWindow;
+  from: string;
+  to: string;
+  scope: "team" | "self";
+  user_id: number | string | null;
+  server_id: number | string | null;
+  totals: AuditMetrics;
+  servers: (AuditMetrics & {
+    server_id: number | string | null;
+    server_name: string;
+    server_deleted: boolean;
+  })[];
+}
 export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;

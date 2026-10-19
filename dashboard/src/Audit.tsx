@@ -8,7 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { date } from "./api";
-import type { Audit, Member, Server, User } from "./api";
+import type { Audit, AuditSummary, AuditWindow, Member, Server, User } from "./api";
 import {
   Badge,
   CopyButton,
@@ -30,6 +30,7 @@ export function AuditPage({
   const [outcome, setOutcome] = useState("");
   const [server, setServer] = useState("");
   const [person, setPerson] = useState("");
+  const [window, setWindow] = useState<AuditWindow>("24h");
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Audit>();
   const params = new URLSearchParams({
@@ -42,6 +43,12 @@ export function AuditPage({
   const records = useResource<{ items: Audit[]; total: number }>(
     `/audit?${params}`,
   );
+  const summaryParams = new URLSearchParams({
+    window,
+    ...(server ? { server_id: server } : {}),
+    ...(person ? { user_id: person } : {}),
+  });
+  const summary = useResource<AuditSummary>(`/audit/summary?${summaryParams}`);
   const members = useResource<Member[]>(
     user.role === "admin" ? "/members" : null,
   );
@@ -57,7 +64,7 @@ export function AuditPage({
   return (
     <>
       <PageHeading
-        eyebrow="TOOL CALL HISTORY"
+        eyebrow="TOOL CALLS & PERFORMANCE"
         title="Activity"
         description={
           user.role === "admin"
@@ -67,37 +74,56 @@ export function AuditPage({
         action={
           <button
             className="button secondary"
-            onClick={() => void records.refresh()}
-            disabled={records.loading}
+            onClick={() => {
+              void records.refresh();
+              void summary.refresh();
+            }}
+            disabled={records.loading || summary.loading}
           >
-            <RefreshCw size={16} className={records.loading ? "spin" : ""} />
+            <RefreshCw
+              size={16}
+              className={records.loading || summary.loading ? "spin" : ""}
+            />
             Refresh
           </button>
         }
       />
-      <section className="panel audit-panel">
-        <div className="audit-filters">
+      <section
+        className="panel activity-overview"
+        aria-labelledby="activity-overview-title"
+        aria-busy={summary.loading}
+      >
+        <div className="activity-overview-heading">
+          <div>
+            <h2 id="activity-overview-title">Activity overview</h2>
+            <p>
+              {user.role === "admin" ? "Your team's" : "Your"} gateway calls,
+              failures and response times.
+            </p>
+          </div>
+          <div
+            className="activity-window"
+            role="group"
+            aria-label="Overview time window"
+          >
+            {(["1h", "24h", "7d"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-label={windowLabel(value)}
+                aria-pressed={window === value}
+                onClick={() => setWindow(value)}
+              >
+                {{ "1h": "1 hour", "24h": "24 hours", "7d": "7 days" }[value]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="audit-filters activity-shared-filters">
           <div>
             <Search size={16} />
-            <strong>Filter activity</strong>
+            <strong>Overview & history</strong>
           </div>
-          <label>
-            <span className="sr-only">Filter by outcome</span>
-            <select
-              value={outcome}
-              onChange={(e) => filter(setOutcome, e.target.value)}
-            >
-              <option value="">All outcomes</option>
-              <option value="success">Successful</option>
-              <option value="error">Connection error</option>
-              <option value="tool_error">Tool error</option>
-              <option value="timeout">Timed out</option>
-              <option value="invalid_arguments">Invalid arguments</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="pending">In progress</option>
-              <option value="denied">Denied</option>
-            </select>
-          </label>
           <label>
             <span className="sr-only">Filter by connection</span>
             <select
@@ -129,28 +155,75 @@ export function AuditPage({
               </select>
             </label>
           )}
-          {(outcome || server || person) && (
+          {(server || person) && (
             <button
               className="text-button"
               onClick={() => {
-                setOutcome("");
                 setServer("");
                 setPerson("");
                 setOffset(0);
               }}
             >
-              Clear
+              Clear filters
             </button>
           )}
         </div>
-        {records.error && (
-          <ErrorBox message={records.error} retry={records.refresh} />
-        )}{" "}
         {members.error && (
           <ErrorBox
             message={`Teammate filters are unavailable. ${members.error}`}
             retry={members.refresh}
           />
+        )}
+        {summary.error ? (
+          <ErrorBox
+            message={`Activity overview is unavailable. ${summary.error}`}
+            retry={summary.refresh}
+          />
+        ) : summary.data ? (
+          <ActivityOverview data={summary.data} updating={summary.loading} />
+        ) : (
+          <div className="loading-panel">
+            <Spinner label="Loading activity overview" />
+          </div>
+        )}
+      </section>
+      <section
+        className="panel audit-panel"
+        aria-labelledby="activity-history-title"
+      >
+        <div className="audit-filters activity-history-heading">
+          <div>
+            <h2 id="activity-history-title">Tool call history</h2>
+            <span>All time</span>
+          </div>
+          <label>
+            <span className="sr-only">Filter by outcome</span>
+            <select
+              value={outcome}
+              onChange={(e) => filter(setOutcome, e.target.value)}
+            >
+              <option value="">All outcomes</option>
+              <option value="success">Successful</option>
+              <option value="error">Connection error</option>
+              <option value="tool_error">Tool error</option>
+              <option value="timeout">Timed out</option>
+              <option value="invalid_arguments">Invalid arguments</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="pending">In progress</option>
+              <option value="denied">Denied</option>
+            </select>
+          </label>
+          {outcome && (
+            <button
+              className="text-button"
+              onClick={() => filter(setOutcome, "")}
+            >
+              Clear outcome
+            </button>
+          )}
+        </div>
+        {records.error && (
+          <ErrorBox message={records.error} retry={records.refresh} />
         )}
         {records.loading && !records.data ? (
           <div className="loading-panel">
@@ -221,7 +294,9 @@ export function AuditPage({
                     </td>
                     <td className="duration-cell">
                       <Clock3 size={13} />
-                      {record.duration_ms.toLocaleString()} ms
+                      {record.outcome === "pending"
+                        ? "In progress"
+                        : `${record.duration_ms.toLocaleString()} ms`}
                     </td>
                     <td className="nowrap">{date(record.timestamp)}</td>
                     <td>
@@ -274,8 +349,8 @@ export function AuditPage({
         </div>
       </section>
       <p className="quiet-note">
-        Activity reflects executed or denied gateway calls. Conversation text
-        and secret credentials are not shown here.
+        Activity records gateway tool calls and their outcomes. Conversation
+        text and secret credentials are not shown here.
       </p>
       {selected && (
         <Modal title="Tool call details" onClose={() => setSelected(undefined)}>
@@ -304,7 +379,11 @@ export function AuditPage({
             </div>
             <div>
               <dt>Duration</dt>
-              <dd>{selected.duration_ms} ms</dd>
+              <dd>
+                {selected.outcome === "pending"
+                  ? "In progress"
+                  : `${selected.duration_ms.toLocaleString()} ms`}
+              </dd>
             </div>
             <div>
               <dt>Outcome</dt>
@@ -323,6 +402,231 @@ export function AuditPage({
   );
 }
 
+function ActivityOverview({
+  data,
+  updating,
+}: {
+  data: AuditSummary;
+  updating: boolean;
+}) {
+  const totals = data.totals;
+  const outcomes = Object.entries(totals.outcomes).filter(([, count]) => count > 0);
+  return (
+    <>
+      <div className="activity-summary-meta">
+        <span>
+          {windowLabel(data.window)} ·{" "}
+          {data.scope === "self"
+            ? "Your activity"
+            : data.user_id !== null
+              ? "Selected teammate"
+              : "Team activity"}
+        </span>
+        <span>
+          {updating ? (
+            <Spinner label="Updating overview" />
+          ) : (
+            <>
+              As of <time dateTime={data.to}>{date(data.to)}</time>
+            </>
+          )}
+        </span>
+      </div>
+      <dl className="activity-metrics">
+        <div>
+          <dt>Total calls</dt>
+          <dd>
+            <span className="activity-metric-value">
+              {totals.calls.toLocaleString()}
+            </span>
+            <span className="activity-metric-note">
+              All outcomes in this window
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>Failure rate</dt>
+          <dd>
+            <span
+              className={`activity-metric-value ${totals.failed_calls > 0 ? "has-failures" : ""}`}
+            >
+              {failureRate(totals.failure_rate)}
+            </span>
+            <span className="activity-metric-note">
+              {totals.completed_calls
+                ? `${totals.failed_calls.toLocaleString()} of ${totals.completed_calls.toLocaleString()} completed calls`
+                : "No completed calls"}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>Median latency</dt>
+          <dd>
+            <span className="activity-metric-value">
+              {latency(totals.p50_latency_ms)}
+            </span>
+            <span className="activity-metric-note">
+              {sampleLabel(totals.latency_samples)}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>p95 latency</dt>
+          <dd>
+            <span className="activity-metric-value">
+              {latency(totals.p95_latency_ms)}
+            </span>
+            <span className="activity-metric-note">
+              {sampleLabel(totals.latency_samples)}
+            </span>
+          </dd>
+        </div>
+      </dl>
+      {outcomes.length > 0 && (
+        <div
+          className="activity-outcomes"
+          aria-label="Call outcomes in this window"
+        >
+          <span className="activity-outcomes-label">Outcomes</span>
+          <ul>
+            {outcomes.map(([outcome, count]) => (
+              <li key={outcome}>
+                <span
+                  className={`activity-outcome-dot ${
+                    outcome === "success"
+                      ? "is-good"
+                      : ["error", "tool_error", "timeout"].includes(outcome)
+                        ? "is-failure"
+                        : ""
+                  }`}
+                  aria-hidden="true"
+                />
+                {outcomeLabel(outcome)} <strong>{count.toLocaleString()}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="activity-connections-heading">
+        <h3>By connection</h3>
+        <span>End-to-end gateway latency</span>
+      </div>
+      {data.servers.length > 0 ? (
+        <>
+          <div
+            className="table-scroll activity-connections"
+            tabIndex={0}
+            role="region"
+            aria-label="Activity metrics by connection"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Connection</th>
+                  <th scope="col">Calls</th>
+                  <th scope="col">Failure rate</th>
+                  <th scope="col">Median</th>
+                  <th scope="col">p95</th>
+                  <th scope="col">Samples</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.servers.map((connection) => (
+                  <tr key={connection.server_id ?? "unattributed"}>
+                    <th scope="row">
+                      {connection.server_name}
+                      {connection.server_deleted && (
+                        <span className="cell-subtitle">Removed connection</span>
+                      )}
+                      {connection.server_id === null && (
+                        <span className="cell-subtitle">
+                          No connection recorded
+                        </span>
+                      )}
+                    </th>
+                    <td>{connection.calls.toLocaleString()}</td>
+                    <td>
+                      <span
+                        className={connection.failed_calls > 0 ? "has-failures" : ""}
+                      >
+                        {failureRate(connection.failure_rate)}
+                      </span>
+                      <span className="cell-subtitle">
+                        {connection.completed_calls
+                          ? `${connection.failed_calls.toLocaleString()} of ${connection.completed_calls.toLocaleString()} completed`
+                          : "No completed calls"}
+                      </span>
+                    </td>
+                    <td>{latency(connection.p50_latency_ms)}</td>
+                    <td>{latency(connection.p95_latency_ms)}</td>
+                    <td>{connection.latency_samples.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="activity-scroll-hint">
+            Scroll sideways to see every metric.
+          </p>
+        </>
+      ) : (
+        <div className="activity-summary-empty">
+          <Activity size={22} aria-hidden="true" />
+          <div>
+            <strong>No calls in this window.</strong>
+            <p>Choose a longer window or change your filters.</p>
+          </div>
+        </div>
+      )}
+      <details className="activity-method">
+        <summary>How these metrics are measured</summary>
+        <div>
+          <p>
+            Failure rate counts connection errors, tool errors and timeouts out
+            of completed calls. Completed calls include successes and these
+            failures. Denied, invalid, cancelled and in-progress calls appear in
+            the total but do not contribute to failure rate or latency.
+          </p>
+          <p>
+            Latency measures the full gateway call, including connection setup
+            and tool execution. It is not the upstream server&apos;s processing
+            time alone. Median and p95 use completed calls with a recorded
+            duration; small samples can vary widely. p95 estimates the duration
+            at the 95th percentile.
+          </p>
+          <p>
+            This overview includes calls started between{" "}
+            <time dateTime={data.from}>{date(data.from, true)}</time> to{" "}
+            <time dateTime={data.to}>{date(data.to, true)}</time>. The outcome
+            filter applies only to the all-time history below.
+          </p>
+        </div>
+      </details>
+    </>
+  );
+}
+
+function windowLabel(window: AuditWindow) {
+  return { "1h": "Last hour", "24h": "Last 24 hours", "7d": "Last 7 days" }[window];
+}
+
+function failureRate(value: number | null) {
+  if (value === null) return "No data";
+  if (value > 0 && value < 0.001) return "<0.1%";
+  return `${(value * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+}
+
+function latency(value: number | null) {
+  if (value === null) return "No data";
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ms`;
+}
+
+function sampleLabel(count: number) {
+  return count
+    ? `${count.toLocaleString()} measured ${count === 1 ? "call" : "calls"}`
+    : "No latency samples";
+}
+
 function outcomeLabel(outcome: string) {
   return (
     (
@@ -335,6 +639,7 @@ function outcomeLabel(outcome: string) {
         invalid_arguments: "Invalid arguments",
         cancelled: "Cancelled",
         pending: "In progress",
+        other: "Other",
       } as Record<string, string>
     )[outcome] ?? outcome
   );

@@ -116,6 +116,25 @@ async def main():
             "/api/keys": [],
             "/api/invites": [],
             "/api/audit": {"items": [], "total": 0},
+            "/api/audit/summary": {
+                "window": "24h",
+                "from": "2026-10-19T09:00:00Z",
+                "to": "2026-10-20T09:00:00Z",
+                "scope": "self" if role == "member" else "team",
+                "user_id": 1 if role == "member" else None,
+                "server_id": None,
+                "totals": {
+                    "calls": 0,
+                    "completed_calls": 0,
+                    "failed_calls": 0,
+                    "failure_rate": None,
+                    "latency_samples": 0,
+                    "p50_latency_ms": None,
+                    "p95_latency_ms": None,
+                    "outcomes": {},
+                },
+                "servers": [],
+            },
             "/api/chat": {
                 "message": "Review the proposed change.",
                 "tool_calls": [
@@ -242,8 +261,8 @@ async def main():
                 await page.goto(BASE + "/#audit")
                 await expect(page.get_by_role("heading", name="No tool calls yet.")).to_be_visible()
                 if width <= 430:
-                    first = await page.get_by_label("Filter by outcome").bounding_box()
-                    second = await page.get_by_label("Filter by connection").bounding_box()
+                    first = await page.get_by_label("Filter by connection").bounding_box()
+                    second = await page.get_by_label("Filter by teammate").bounding_box()
                     assert first and second and second["y"] >= first["y"] + first["height"]
                 if width == 320:
                     await page.screenshot(path=str(OUT / "activity-320.png"), full_page=True)
