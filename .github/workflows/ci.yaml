@@ -54,6 +54,22 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci && npm run build
         working-directory: dashboard
+      - name: Install browser test runtime
+        run: uv run playwright install --with-deps chromium
+      - name: Check Activity and responsive accessibility
+        env:
+          HARBOR_URL: http://127.0.0.1:5175
+        run: |
+          npm --prefix dashboard run preview -- --host 127.0.0.1 --port 5175 > /tmp/harbor-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$HARBOR_URL" > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS "$HARBOR_URL" > /dev/null
+          uv run python -m tests.browser_observability
+          uv run python -m tests.browser_accessibility
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
