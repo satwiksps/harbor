@@ -267,6 +267,32 @@ class Acceptance:
             own = (await member.get("/api/audit?limit=100")).json()["items"]
             assert all(r["user_id"] == member_user["id"] for r in own)
             self.record("Audit attribution and member record isolation")
+            # This member was created during the run, so all its calls are in
+            # the bounded overview. A forged teammate filter must remain scoped.
+            personal_response = await member.get(
+                "/api/audit/summary", params={"window": "24h", "user_id": admin_user["id"]}
+            )
+            personal_response.raise_for_status()
+            personal = personal_response.json()
+            team_response = await admin.get(
+                "/api/audit/summary", params={"window": "24h", "user_id": member_user["id"]}
+            )
+            team_response.raise_for_status()
+            team = team_response.json()
+            assert personal["scope"] == "self"
+            assert personal["user_id"] == member_user["id"]
+            assert personal["totals"] == team["totals"]
+            assert personal["servers"] == team["servers"]
+            totals = personal["totals"]
+            assert totals["calls"] >= len(own) > 0
+            assert totals["calls"] == sum(totals["outcomes"].values())
+            assert totals["calls"] == sum(row["calls"] for row in personal["servers"])
+            assert totals["failed_calls"] == sum(
+                totals["outcomes"][name] for name in ("error", "tool_error", "timeout")
+            )
+            assert totals["latency_samples"] > 0
+            assert 0 <= totals["p50_latency_ms"] <= totals["p95_latency_ms"]
+            self.record("Activity metrics match live calls and preserve member isolation")
         finally:
             if added_server:
                 await admin.delete(f"/api/servers/{added_server}")
