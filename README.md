@@ -7,6 +7,8 @@
 </p>
 
 <p align="center">
+  <a href="https://harbor.140-245-235-253.sslip.io/">Console</a> &nbsp;·&nbsp;
+  <a href="https://store.140-245-235-253.sslip.io/">Store</a> &nbsp;·&nbsp;
   <a href="https://useharbor.pages.dev/">Documentation</a> &nbsp;·&nbsp;
   <a href="https://useharbor.pages.dev/getting-started/">Installation</a> &nbsp;·&nbsp;
   <a href="https://useharbor.pages.dev/system-design/">Architecture</a> &nbsp;·&nbsp;

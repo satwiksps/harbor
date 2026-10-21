@@ -6,6 +6,8 @@ Harbor lets a team use one WooCommerce store through a shared tool gateway. An a
 
 For example, a member can read today's orders and ask for a shipping estimate. An administrator can also create a product, with an approval step in dashboard chat. Both users' tool calls appear in Activity.
 
+Open the [live console](https://harbor.140-245-235-253.sslip.io/) with an invited team account, or browse the [demo storefront](https://store.140-245-235-253.sslip.io/). Both run on the same single-node deployment described in [operations](operations.md#vps-configuration).
+
 ## Start here
 
 | I want to... | Read |
@@ -19,7 +21,7 @@ For example, a member can read today's orders and ask for a shipping estimate. A
 | Review the security boundary and remaining risks | [Threat model](threat-model.md) |
 | Inspect what was tested and corrected | [Verification](verification.md) and [audit record](audit.md) |
 
-## What runs locally
+## What runs
 
 | Component | Responsibility |
 | --- | --- |
@@ -44,6 +46,6 @@ The React and TypeScript dashboard, Python gateway, three MCP servers and storef
 
 Local execution uses your computer and has no VPS dependency. Chat requires a Gemini API key and is subject to the provider's quota. A missing key leaves management and MCP available, with an explicit unavailable-chat notice.
 
-The system supports one team, one store and one gateway replica. The storefront is a demonstration: it does not collect payments, send email or book carriers. Production deployment guidance is provided, but a public VPS and high availability have not been verified. The [verification record](verification.md) distinguishes completed checks from remaining work, and the [threat model](threat-model.md) explains the security boundaries.
+The system supports one team, one store and one gateway replica. The storefront is a demonstration: it does not collect payments, send email or book carriers. The public Oracle VPS uses time-limited trial credits and trusted HTTPS. Its single node and local storage do not provide high availability. The [verification record](verification.md) distinguishes completed checks from remaining work, and the [threat model](threat-model.md) explains the security boundaries.
 
 This website hosts documentation only. The application repository is private, so repository access is needed to inspect or run the source. Start with [installation](getting-started.md), or use the [technical walkthrough](demo.md) to review an already running system.

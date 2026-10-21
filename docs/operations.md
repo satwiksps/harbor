@@ -1,6 +1,6 @@
 # Operations and deployment
 
-The local target is one k3d server backed by Docker Desktop. It runs the same Helm chart as the k3s VPS example. A single node and local-path storage are deliberate demo constraints: they provide persistence across pod restarts, not node failure recovery or high availability.
+The local target is one k3d server backed by Docker Desktop. It runs the same Helm chart as the public k3s VPS. A single node and local-path storage are deliberate demo constraints: they provide persistence across pod restarts, not node failure recovery or high availability.
 
 Use [Getting started](getting-started.md) for a first installation. This guide covers maintenance, production configuration and recovery. Commands assume the fresh-install namespace and release `harbor`; retained installations must use their recorded names.
 
@@ -89,19 +89,29 @@ The deployment script creates `.runtime/values-runtime.yaml` with the actual nod
 
 The WordPress bootstrap Job runs after installation and upgrades. It installs WordPress once, activates the packaged WooCommerce and Storefront versions, and creates missing API credentials. Starter products and classic cart/checkout content are initialized only before the `harbor_seed_complete` marker is set; later product deletions and page edits remain intact. Earlier seed markers remain compatible without replaying initialization. It configures INR, the Asia/Kolkata timezone, COD and the sample shipping table, and turns off WooCommerce coming-soon mode so anonymous visitors can browse. If no published privacy page exists, it publishes a short demo data-use notice once and links checkout to it; later edits remain intact. The demo intentionally has no outbound email provider. The original product SVGs are packaged assets; arbitrary SVG uploads are not enabled. Products without media have a labeled typographic card rather than a broken-image icon.
 
+Initialization runs through WP-CLI. Apache blocks the browser installer and setup-configuration endpoints, including path suffixes, from the first start. Normal administrator sign-in remains available after bootstrap.
+
 The tested store image pins WordPress 7.1.3, PHP 8.3, WooCommerce 11.2.1, Storefront 4.6.2 and WP-CLI 2.12.0. Plugin and theme downloads have checked SHA256 values in the Dockerfile. The database images are MariaDB 11.4.13 and PostgreSQL 17.11. Version changes should go through backup and compatibility checks.
 
 ## VPS configuration
 
-No public VPS deployment is claimed. These steps describe the production-like target using the same chart. The server needs sufficient memory, disk space, inbound TCP 80/443, and a private administration path. Restrict port 6443 to operators. Do not expose database or upstream ports.
+The [public console](https://harbor.140-245-235-253.sslip.io/) and [storefront](https://store.140-245-235-253.sslip.io/) run on one Oracle VM using the same Harbor chart as the local installation.
+
+| Setting | Deployed configuration |
+| --- | --- |
+| Compute | AMD `VM.Standard.E5.Flex`, 2 OCPUs, 12 GB RAM, 100 GB boot volume |
+| Operating system | Ubuntu 24.04, x86-64 |
+| Kubernetes and packaging | k3s `v1.35.5+k3s1`, Helm `4.3.1` |
+| HTTPS | Traefik, cert-manager `v1.21.2`, trusted Let's Encrypt certificate |
+| Persistence | Three bound PVCs for PostgreSQL, MariaDB and WordPress content |
+
+The 21 October 2026 deployment check found all eight application deployments ready and both HTTPS hostnames valid. HTTP redirects to HTTPS. Application, browser and recovery results are recorded separately in [verification](verification.md).
 
 ### Oracle hosting choices
 
-The Always Free target is one `VM.Standard.A1.Flex` instance in the account's home region, Ubuntu 24.04 Arm, 2 OCPUs, 12 GB RAM and a 100 GB boot volume. Launch attempts on 20 and 21 October 2026 failed because Hyderabad had no available Arm capacity. An AMD E4 attempt also encountered a capacity limit. The trial target is `VM.Standard.E5.Flex` with 2 OCPUs, 12 GB RAM and a 100 GB boot volume. That AMD shape consumes trial credits; it is not Always Free. Public application verification is still pending.
+The deployed E5 VM consumes trial credits and is not an Always Free resource. The account remains on Free Tier without a Pay As You Go upgrade. Trial resources are temporary: back up and migrate the deployment before the credits or trial period expire. Oracle states that the card is not charged unless the account is upgraded. See the [trial and expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
 
-Oracle currently includes 1,500 A1 OCPU hours, 9,000 GB memory hours and 200 GB combined boot/block storage each month in the home region. The A1 configuration fits those limits. Trial credits are separate and expire after the trial period or when consumed. Keep the account on Free Tier and verify its remaining credits before creating a trial VM. Oracle states that the card is not charged unless the account is upgraded. Do not upgrade to Pay As You Go, and back up and migrate the AMD deployment before trial resources are reclaimed. See [Oracle's current limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [trial expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
-
-Always Free capacity is not guaranteed, and Oracle may reclaim idle instances. Keep an off-node backup and treat this as a demonstration host. An Arm VM needs Arm-compatible images: build on the VM or explicitly build for `linux/arm64`. The source and container images can remain private by transferring a reviewed source archive over SSH, building on the VM, and importing images into k3s.
+Always Free Ampere capacity was unavailable when this VM was created. A later move to Arm needs images built for `linux/arm64` and a database/content restore. Verify [Oracle's current free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) before creating replacement resources. Free capacity and continued availability are not guaranteed; keep an off-node backup.
 
 ### Prepare the public host
 
@@ -147,7 +157,7 @@ The version and signature-verification options follow the [official cert-manager
 
 ### Deploy a reviewed release
 
-Copy a source archive containing only tracked project files to the VM over SSH. Do not copy a Git credential, local databases or the development credential directory. Generate fresh production credentials with the helper below; transfer the selected Gemini key separately into `.secrets/gemini-api-key.txt` with directory mode 700 and file mode 600. Without that key, the application starts but chat remains unavailable.
+Copy a source archive containing only tracked project files to the VM over SSH. Do not copy a Git credential, local databases or the development credential directory. The images normalize source and asset read permissions so a private archive extracted with `umask 077` still works with non-root processes. Generate fresh production credentials with the helper below; transfer the selected Gemini key separately into `.secrets/gemini-api-key.txt` with directory mode 700 and file mode 600. Without that key, the application starts but chat remains unavailable.
 
 Build on the VM with a unique tag for this source revision, then import into k3s. Run one build at a time:
 
