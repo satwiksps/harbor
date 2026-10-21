@@ -4,6 +4,24 @@ This page records completed source, browser fixture, local k3d and public VPS ch
 
 Unit tests, fixture-driven browser regressions and live end-to-end checks establish different things. A passing fixture check does not prove that Gemini, checkout or a restored database works. Live checks use synthetic data; only checks that call Gemini consume provider quota.
 
+## Custom domains, 21 October 2026
+
+The console, store and documentation moved to the [current public addresses](operations.md#vps-configuration). Helm revision 6 retains the `87ae800` application images and existing data. A consistent backup was taken before changing hosts and copied off the VM with matching checksums. The portfolio's root and `www` DNS records were unchanged.
+
+| Check | Observed result |
+| --- | --- |
+| DNS and HTTPS | Both public resolvers returned the expected records. All three custom domains had trusted certificates; the old console and store addresses redirected with paths and queries preserved |
+| API, identity and external clients | All 14 non-LLM acceptance checks and eight invitation checks passed. MCP Inspector discovered the upstreams and completed a member read; temporary test keys were revoked |
+| Checkout and stored data | Gemini proposed product 23, explicit approval created it, and checkout saved order 24 for INR 308, including INR 59 shipping. WordPress administration and direct MCP reads matched its amounts; an order-status change was restored |
+| Order chat | A separate browser request used the real orders tool and returned order 24 on its first attempt |
+| Responsive layouts | 51 captures from 320 to 1440 px passed without document-wide overflow or JavaScript exceptions |
+| Public boundaries and documentation | Six installer variants returned 403, 29 checked application assets loaded, and private documentation paths returned 404. Published pages used the new canonical documentation address |
+| Future deployments | Ten offline helper cases passed, including preservation of both current and legacy TLS entries and rejection of hostname changes before cluster mutations. The installed helper passed shell syntax validation; no additional application rollout was needed |
+
+The original checkout journey's final chat received provider HTTP 503, and a separate policy-and-shipping chat received provider HTTP 504. Gateway logs attributed both to the model provider. Their reports remain incomplete; the later successful order chat does not erase those failures. No duplicate checkout was created during follow-up checks.
+
+The operator's DNS resolver still cached an earlier negative answer during verification. Tests resolved the custom hosts explicitly to their publicly verified addresses within the test process, preserving the real URL, Host header, SNI and certificate validation. No operating-system DNS settings changed. This verifies the hosted services, not cache expiry on every visitor's network.
+
 ## Public deployment, 21 October 2026
 
 The initial public console and store deployment used source `87ae800` as Helm revision 3 on one AMD Oracle VM. The checks below ran against the original `sslip.io` hostnames; the current public addresses are listed in [operations](operations.md#vps-configuration). The account remains on Free Tier; this E5 instance consumes expiring trial credits and is not an Always Free instance. See [hosting configuration](operations.md#vps-configuration) for the exact versions and limits.
