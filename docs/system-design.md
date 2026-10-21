@@ -98,7 +98,7 @@ Prices remain decimal strings and Python Decimal values. The sample store uses I
 
 ## Local and production
 
-Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production images can come from an accessible private registry or be built and imported directly on a single k3s node. The public VPS deployment is not implied by local verification.
+Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production images can come from an accessible private registry or be built and imported directly on a single k3s node. The [public VPS](operations.md#vps-configuration) uses the latter approach, with separately recorded [live verification](verification.md#public-deployment-21-october-2026).
 
 One replica per component is intentional. PostgreSQL and MariaDB are not HA, local-path volumes are node-local, in-process rate limits are not distributed, and the gateway is not horizontally scaled. These are documented limits of a small single-node deployment. Redis, queues, a service mesh and a custom operator would add operational cost beyond the needs of this scope.
 

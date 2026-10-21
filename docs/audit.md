@@ -69,6 +69,6 @@ Source scanning checks for committed private files, known credential values, bro
 
 ## Remaining boundaries
 
-The tested deployment is local and single-node. Public TLS, a VPS deployment, sustained load and browser engines other than Chromium need separate validation. Backup restoration was exercised locally on 20 October; that result does not establish recovery time or portability to every production environment. Free Gemini quota and availability remain external dependencies.
+Both local k3d and the public single-node VPS have been tested. The [21 October verification record](verification.md#public-deployment-21-october-2026) covers public TLS, live application flows, a VM restart and isolated backup imports. Sustained load and browser engines other than Chromium remain untested. The recovery checks do not establish a recovery-time guarantee or portability to every environment. Free Gemini quota and availability remain external dependencies.
 
 The application repository remains private. No email delivery, carrier integration or high availability is presented as implemented functionality.

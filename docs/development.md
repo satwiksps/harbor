@@ -92,6 +92,25 @@ uv run python -m tests.browser_acceptance
 
 `tests.browser_acceptance --audit-only` writes a separate activity-only report. It does not establish that the complete checkout and chat journey passed.
 
+### Testing a public deployment
+
+Use the public console and store URLs together. Copy that server's private `development.json` into a protected, Git-excluded local directory; the example uses `.secrets/oci/production`. This file contains the live credentials, so do not substitute the local development file or publish it with the reports.
+
+```powershell
+$env:HARBOR_URL = 'https://harbor.140-245-235-253.sslip.io'
+$env:HARBOR_STORE_URL = 'https://store.140-245-235-253.sslip.io'
+$env:HARBOR_TEST_CREDENTIALS = (Resolve-Path '.secrets/oci/production/development.json').Path
+$env:HARBOR_TEST_OUTPUT_DIR = Join-Path (Get-Location) ('.runtime/public-' + (Get-Date -Format yyyyMMdd-HHmmss))
+uv run python -m tests.acceptance
+uv run python -m tests.browser_invitation
+uv run python -m tests.browser_visual
+uv run python -m tests.external_agent --inspector-only
+```
+
+Run the Gemini/checkout commands above afterward when a synthetic product and order are appropriate. The harnesses create test members, revoke temporary keys and keep reports separate from local checks. Checkout records remain in the demonstration store. Run suites sequentially and retain failed reports alongside successful reruns.
+
+These settings apply to the deployed Python harnesses, not every operational script. Local recovery and failure scripts still target the local cluster; review their context before using any operation against a VPS. Clear the four environment variables when returning to local testing.
+
 ## External client verification
 
 The [external client guide](external-clients.md) describes MCP Inspector and an independent SDK agent with no backend imports. The [sanitized evidence](assets/external-agent-evidence.json) records a successful run across all three upstreams for order 25. Gemini CLI is not a claimed passing client.
@@ -102,6 +121,6 @@ The [verification record](verification.md) lists executed checks, their environm
 
 The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL cases, recovery and credential-preparation guards, the dashboard build, and Activity/accessibility browser fixtures against that build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
 
-The system deliberately uses one store, one gateway replica and process-local rate limits. Public deployment requires TLS, secure cookies, cluster Secret encryption and protected backups. Production values are a template; they do not demonstrate a deployed VPS. Schema migrations are forward-only until an explicit rollback migration exists.
+The system deliberately uses one store, one gateway replica and process-local rate limits. The [public deployment](operations.md#vps-configuration) uses TLS, secure cookies, cluster Secret encryption and protected backups. Production values remain a template that must be adapted for each target. Schema migrations are forward-only until an explicit rollback migration exists.
 
 Keep credentials, raw runtime evidence, recordings and private project material outside commits. Before sharing a demo, use the [walkthrough checklist](demo.md) to review it for passwords, keys and invitation tokens.

@@ -1,8 +1,39 @@
 # Verification record
 
-This page records completed source, browser fixture and local k3d checks. Results apply to the dated run and source state, not every future installation. The [development guide](development.md) gives the recommended commands and prerequisites for a new run.
+This page records completed source, browser fixture, local k3d and public VPS checks. Results apply to the dated run and source state, not every future installation. The [development guide](development.md) gives the recommended commands and prerequisites for a new run.
 
 Unit tests, fixture-driven browser regressions and live end-to-end checks establish different things. A passing fixture check does not prove that Gemini, checkout or a restored database works. Live checks use synthetic data; only checks that call Gemini consume provider quota.
+
+## Public deployment, 21 October 2026
+
+The [console](https://harbor.140-245-235-253.sslip.io/) and [store](https://store.140-245-235-253.sslip.io/) run source `87ae800` as Helm revision 3 on one AMD Oracle VM. The account remains on Free Tier; this E5 instance consumes expiring trial credits and is not an Always Free instance. See [hosting configuration](operations.md#vps-configuration) for the exact versions and limits.
+
+| Check | Observed result |
+| --- | --- |
+| Windows regression suite | 214 passed; three PostgreSQL cases and one Linux-only case skipped on this host |
+| Live API and MCP acceptance | All 15 checks passed, including role-filtered discovery, direct-call denial, revocation, registry changes, activity metrics and real Gemini calls to policy and shipping tools |
+| Live browser journey | All nine checks passed. Explicit approval created product 21, checkout saved order 22 for INR 249 plus INR 59 shipping, and WordPress administration, order amounts, status changes and today's-orders chat matched the stored order |
+| Invitation and identity switching | All eight browser checks passed against the public backend |
+| Independent MCP client | MCP Inspector discovered the three upstreams and completed a real member read |
+| Responsive presentation | 51 live dashboard/store captures passed from 320 to 1440 px without document-wide overflow or JavaScript exceptions |
+| Browser fixtures on the deployed bundle | Nine UI checks, 40 accessibility checks and ten Activity checks passed. These use controlled API responses for the relevant scenarios and are separate from live backend evidence |
+| Public HTTPS and access boundary | A trusted certificate matched both hosts; HTTP redirects retained paths and queries. Six browser installer URL variants returned 403. All 24 checked assets loaded without mixed-content or local-origin references. Kubernetes, database and upstream ports were unreachable from the external test client |
+| Cluster security | Secret encryption enabled; gateway positive controls, denied peer/untrusted connections and named-Secret-only RBAC passed, including after the reboot |
+| Actual backup imports | Nine PostgreSQL tables and 52 MariaDB tables restored into fresh disposable storage with matching row counts and content fingerprints. Migration `0003`, five products and both test orders were preserved. All 6,119 archived WordPress files extracted and matched their archived contents |
+| Off-node backup | Private backup copied to the operator's machine; all seven file checksums matched. Recovery workloads used fresh credentials, deny-all networking and no public endpoint, then were removed |
+| VM restart | A changed boot ID confirmed a real reboot. All eight deployments recovered, with unchanged users, sessions, keys, registry configuration, products/orders, three PVC identities, Secret identities and image references |
+
+The first build exposed restrictive archive permissions that prevented non-root containers from reading source and dashboard files. The images now normalize read/traverse permissions without making those files writable by the runtime user. Browser-based WordPress installation is blocked from the first start; WP-CLI performs initialization.
+
+An early checkout run reached a Gemini 503 after successfully creating its product and order. Chat now retries only an explicit provider 503 once, after one second, inside the existing request deadline. Ten SDK transport regressions verify the retry bound, cancellation, no quota/transport retries and no replay of a completed tool call. The complete live journey passed after deployment. Provider availability and free-tier quota remain external dependencies.
+
+The recovery check proves SQL imports and archive extraction, not startup of a restored application, cross-region failover or a recovery-time guarantee. The earlier application-version rollback demonstration remains separate below. Detailed reports and recordings stay Git-excluded.
+
+### Live model with a large catalog
+
+A separate isolated test used real Gemini with 500 synthetic tools across ten server records. Three model generations searched the catalog, selected the Northstar read operation, called it through the in-process MCP fixture and reported its exact result. One successful tool dispatch and its audit record were verified. No public deployment data was changed.
+
+The full declarations occupied 90,516 bytes. Progressive discovery sent 577 bytes initially and 773 bytes after selecting the tool. These are serialized declaration sizes, not provider-token counts or a production latency benchmark. This closes the live-model evidence gap from the provider-blocked 20 October run; it does not claim ten production upstream servers.
 
 ## Large tool catalogs, 20 October 2026
 
@@ -152,4 +183,4 @@ The earlier release 5 check preserved all three users, four products, order 18, 
 
 The original Gemini 3.8 Flash choice timed out in bounded provider tests. Gemini 3.1 Flash-Lite returned a valid tool call in approximately seven seconds with the same primary key, so it became the configured default. Provider error responses remain visible; there is no fake fallback and no automatic key rotation.
 
-This is not a load test, independent penetration test, HA test or disaster-recovery certification. Public TLS and VPS deployment require their own validation. The host has 16 GB of RAM; concurrent builds and browsers caused pressure during testing, so final integration work is serialized. A Helm rollback cannot restore database contents.
+This is not a load test, independent penetration test, HA test or disaster-recovery certification. Public TLS and VPS results are recorded in the 21 October section. The local development machine has 16 GB of RAM; concurrent builds and browsers caused pressure during testing, so integration work is serialized. A Helm rollback cannot restore database contents.

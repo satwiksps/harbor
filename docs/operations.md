@@ -211,7 +211,7 @@ kubectl -n harbor wait --for=condition=complete job/wordpress-bootstrap --timeou
 
 Set `gateway.adminEmail` to the same address passed to `prepare-secrets.py`. Set `wordpress.adminUser` if its generated name was changed. Namespace creation and the initial upstream Secret creation are first-install operations. On subsequent upgrades, **do not apply the seed upstream Secret again**: registry changes are stored in that mutable Secret. It is deliberately outside Helm release content so rollback cannot restore old upstream credentials.
 
-Confirm application health, login, checkout and an external MCP call after deploying. The local acceptance script supports `--base` for a different console URL. Verify the installed certificate independently. Chart rendering alone is not a VPS deployment test.
+Confirm application health, login, checkout and an external MCP call after deploying. Use the [public test target settings](development.md#testing-a-public-deployment) so the harnesses use that deployment's URLs, credentials and separate evidence directory. Verify the installed certificate independently. Chart rendering alone is not a VPS deployment test.
 
 ## Boundaries and Secret storage
 
