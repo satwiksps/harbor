@@ -6,7 +6,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY backend ./backend
 COPY upstreams ./upstreams
-RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+RUN chmod -R a+rX /app/backend /app/upstreams \
+    && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 ENV PATH="/app/.venv/bin:$PATH"
 USER 10001:10001
 EXPOSE 8000 8001
