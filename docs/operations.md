@@ -95,15 +95,77 @@ The tested store image pins WordPress 7.1.3, PHP 8.3, WooCommerce 11.2.1, Storef
 
 No public VPS deployment is claimed. These steps describe the production-like target using the same chart. The server needs sufficient memory, disk space, inbound TCP 80/443, and a private administration path. Restrict port 6443 to operators. Do not expose database or upstream ports.
 
-### Oracle Always Free preparation
+### Oracle hosting choices
 
-On 20 October 2026, the account was verified as Free Tier with no paid upgrade enabled. The prepared target was one `VM.Standard.A1.Flex` instance in its home region, Ubuntu 24.04 Arm, 2 OCPUs, 12 GB RAM and a 100 GB boot volume. Oracle rejected the launch because the region had no available Arm capacity. This is a prepared deployment, not a running public service.
+The Always Free target is one `VM.Standard.A1.Flex` instance in the account's home region, Ubuntu 24.04 Arm, 2 OCPUs, 12 GB RAM and a 100 GB boot volume. Launch attempts on 20 and 21 October 2026 failed because Hyderabad had no available Arm capacity. An AMD E4 attempt also encountered a capacity limit. The trial target is `VM.Standard.E5.Flex` with 2 OCPUs, 12 GB RAM and a 100 GB boot volume. That AMD shape consumes trial credits; it is not Always Free. Public application verification is still pending.
 
-Oracle currently includes 1,500 A1 OCPU hours, 9,000 GB memory hours and 200 GB combined boot/block storage each month in the home region. This single-instance configuration fits those limits. The time-limited trial credits are separate. Keep the account on Free Tier, check the tenancy's existing allocations before creating resources, and do not select a paid shape as a capacity workaround. The console's raw storage estimate does not apply every free allowance. See [Oracle's current limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [trial expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
+Oracle currently includes 1,500 A1 OCPU hours, 9,000 GB memory hours and 200 GB combined boot/block storage each month in the home region. The A1 configuration fits those limits. Trial credits are separate and expire after the trial period or when consumed. Keep the account on Free Tier and verify its remaining credits before creating a trial VM. Oracle states that the card is not charged unless the account is upgraded. Do not upgrade to Pay As You Go, and back up and migrate the AMD deployment before trial resources are reclaimed. See [Oracle's current limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [trial expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
 
 Always Free capacity is not guaranteed, and Oracle may reclaim idle instances. Keep an off-node backup and treat this as a demonstration host. An Arm VM needs Arm-compatible images: build on the VM or explicitly build for `linux/arm64`. The source and container images can remain private by transferring a reviewed source archive over SSH, building on the VM, and importing images into k3s.
 
-### Install and configure k3s
+### Prepare the public host
+
+Use one VM and its existing public address, without an external cloud load balancer. In the cloud firewall allow TCP 80/443 from the internet and TCP 22 only from the operator's current public IP. Keep 6443, database ports and upstream ports closed to the internet. SSH provides the administration path. Inspect the Ubuntu host firewall too: retain Oracle's existing link-local and storage rules, then permit the web ports and k3s pod forwarding. Do not flush the firewall or use UFW to edit an Oracle Ubuntu image's rules. See [Oracle's essential firewall rules](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm#Essential_Firewall_Rules).
+
+Use two DNS names pointing to the VM. Without a purchased domain, `harbor.PUBLIC-IP-WITH-DASHES.sslip.io` and `store.PUBLIC-IP-WITH-DASHES.sslip.io` resolve to the embedded address. The service supports individual Let's Encrypt certificates through HTTP-01. It is a shared external DNS dependency, and changing the VM address changes these hostnames. Verify both names resolve correctly before requesting a certificate. See [sslip.io's DNS and TLS documentation](https://sslip.io/).
+
+On a fresh Ubuntu VM, install Docker only as an image builder, plus Python 3, curl and CA certificates. Keep k3s on its own containerd runtime. Docker can change the host's FORWARD policy, so inspect the resulting rules and verify external HTTP traffic after installation. Do not expose the Docker API.
+
+Download and review the pinned k3s installer, then install with Secret encryption:
+
+```sh
+curl -fsSLo /tmp/install-k3s.sh 'https://raw.githubusercontent.com/k3s-io/k3s/v1.35.5%2Bk3s1/install.sh'
+sudo env INSTALL_K3S_VERSION='v1.35.5+k3s1' sh /tmp/install-k3s.sh server \
+  --secrets-encryption --write-kubeconfig-mode 600
+sudo k3s secrets-encrypt status
+sudo kubectl get nodes -o wide
+```
+
+Do not set `node-external-ip` for an OCI node behind public-IP NAT when preserving client addresses with `externalTrafficPolicy: Local`. K3s documents that combination as incompatible. The provided Traefik configuration uses `Local` and leaves forwarding-header trust disabled. See [K3s ServiceLB behavior](https://docs.k3s.io/networking/networking-services#usage).
+
+Install the pinned Helm archive matching the VM architecture and verify its official checksum. For AMD:
+
+```sh
+curl -fsSLO https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz
+curl -fsSLO https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz.sha256sum
+sha256sum -c helm-v4.3.1-linux-amd64.tar.gz.sha256sum
+tar -xzf helm-v4.3.1-linux-amd64.tar.gz
+sudo install -m 0755 linux-amd64/helm /usr/local/bin/helm
+```
+
+Install cert-manager once at cluster level. The chart signature is checked against the project's published keyring:
+
+```sh
+curl -fsSLo /tmp/cert-manager.gpg https://cert-manager.io/public-keys/cert-manager-keyring-2021-09-20-1020CF3C033D4F35BAE1C19E1226061C665DF13E.gpg
+sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install cert-manager \
+  oci://quay.io/jetstack/charts/cert-manager --version v1.21.2 \
+  --namespace cert-manager --create-namespace --set crds.enabled=true \
+  --verify --keyring /tmp/cert-manager.gpg --wait --timeout 5m
+```
+
+The version and signature-verification options follow the [official cert-manager installation guide](https://cert-manager.io/docs/installation/helm/). Harbor's namespace uses default-deny networking. `networkPolicy.allowAcmeHttp01: true` permits only Traefik to reach temporary challenge pods on port 8089. The solver uses a ClusterIP Service, and its HTTP route takes precedence over the normal HTTPS redirect. Keep this allowance after the first certificate is issued so renewal can succeed.
+
+### Deploy a reviewed release
+
+Copy a source archive containing only tracked project files to the VM over SSH. Do not copy a Git credential, local databases or the development credential directory. Generate fresh production credentials with the helper below; transfer the selected Gemini key separately into `.secrets/gemini-api-key.txt` with directory mode 700 and file mode 600. Without that key, the application starts but chat remains unavailable.
+
+Build on the VM with a unique tag for this source revision, then import into k3s. Run one build at a time:
+
+```sh
+tag=release-YYYYMMDD-SHORTSHA
+sudo docker build -t "harbor:$tag" -f Dockerfile .
+sudo docker build -t "harbor-dashboard:$tag" -f dashboard/Dockerfile .
+sudo docker build -t "harbor-wordpress:$tag" -f docker/wordpress/Dockerfile docker/wordpress
+set -o pipefail
+sudo docker save "harbor:$tag" "harbor-dashboard:$tag" "harbor-wordpress:$tag" | sudo k3s ctr images import -
+sudo bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL "$tag"
+```
+
+The VPS helper operates only on `/etc/rancher/k3s/k3s.yaml`, requires one ready node, uses namespace and release `harbor`, discovers the node and pod addresses, and writes non-secret values to `.runtime/values-vps.json`. It creates private credentials, preserves existing application and upstream Secrets, applies the ingress configuration and deploys the same chart used locally. It refuses to generate passwords over existing data or proceed with credential files that differ from the deployed application Secret. Credential rotation remains a deliberate operation. It waits for WordPress bootstrap and the public certificate, but application acceptance testing remains a separate step. Keep `.secrets/development.json` and the Gemini key in a protected off-node backup.
+
+`deploy/vps/traefik.yaml` changes the cluster's ingress controller, so use it only on the dedicated Harbor node. `deploy/vps/tls.yaml` creates a namespace-scoped issuer. Neither file creates billable cloud infrastructure. For a different ingress controller, an existing certificate, or a different namespace, use the manual configuration below.
+
+### Manual deployment configuration
 
 1. Install a supported k3s version with Traefik, local-path storage, the network-policy controller, and `--secrets-encryption`. The locally tested version is `v1.35.5+k3s1`. Follow the [official k3s installation guide](https://docs.k3s.io/quick-start); inspect and pin installer inputs for your environment. Keep Secret encryption keys and the cluster token in a protected backup.
 2. Point two DNS names to the server. Provision a certificate and a TLS Secret or install cert-manager separately. TLS is required for real credentials on a public deployment. Configure Traefik to redirect HTTP to HTTPS. If using cert-manager's HTTP-01 challenge, explicitly allow Traefik to reach its solver pods through the namespace's default-deny NetworkPolicy, including during renewal. Merely setting `ingress.tls` does not issue a certificate or create a redirect.
@@ -184,16 +246,13 @@ Before changing application schemas, WordPress, WooCommerce or database versions
 
 It writes under `.secrets/backups/<UTC timestamp>` with a directory ACL limited to the current Windows account. Database/archive files keep a `.partial` suffix until their command succeeds. Copy backups to protected storage off the node and verify restoration on a separate environment before relying on them. Without quiesced writes, these files are independent snapshots rather than one transaction across systems. PostgreSQL contains upstream credential references, so a database backup without the corresponding mutable Secret is incomplete.
 
-Equivalent Linux backup commands:
+On the dedicated Linux VPS, use:
 
 ```sh
-umask 077
-mkdir -p /secure/backups/harbor
-kubectl -n harbor get secret harbor-app-secrets harbor-upstream-credentials -o json > /secure/backups/harbor/kubernetes-secrets.json
-kubectl -n harbor exec deployment/postgres -- pg_dump -U harbor -d harbor -Fc > /secure/backups/harbor/gateway.dump
-kubectl -n harbor exec deployment/mariadb -- sh -c 'mariadb-dump --single-transaction --user=wordpress --password="$MARIADB_PASSWORD" wordpress' > /secure/backups/harbor/wordpress.sql
-kubectl -n harbor exec deployment/wordpress -- tar -czf - -C /var/www/html wp-content wp-config.php > /secure/backups/harbor/wordpress-content.tar.gz
+sudo bash scripts/backup-vps.sh
 ```
+
+This creates a new mode-700 directory under `.secrets/backups`, keeps failed outputs marked `.partial`, removes server-generated Secret metadata for recovery, and records Helm values and checksums alongside the database/content backups. Copy the completed directory off the VM. This is an application backup, not a snapshot of the k3s control plane. A replacement node can generate a new cluster and issue a new TLS certificate before restoring the application data.
 
 ### Upgrade or roll back application configuration
 

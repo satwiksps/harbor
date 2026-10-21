@@ -1,0 +1,27 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    ports:
+      web:
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+              # The HTTP-01 solver has higher priority and stays on port 80.
+              priority: 10
+        forwardedHeaders:
+          insecure: false
+          trustedIPs: []
+      websecure:
+        forwardedHeaders:
+          insecure: false
+          trustedIPs: []

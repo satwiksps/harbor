@@ -65,6 +65,7 @@ upstreams:
     limits: {cpu: 500m, memory: 256Mi}
 networkPolicy:
   enabled: true
+  allowAcmeHttp01: false
   ingressNamespace: kube-system
   ingressPodLabel:
     app.kubernetes.io/name: traefik
