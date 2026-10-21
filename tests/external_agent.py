@@ -13,9 +13,11 @@ from pathlib import Path
 
 import httpx
 
+from tests.deployed_config import console_url, output_path, private_path
+
 ROOT = Path(__file__).resolve().parents[1]
-WORK = ROOT / ".secrets" / "external-client"
-REPORT = ROOT / ".runtime" / "external-agent-report.json"
+WORK = private_path(ROOT, "external-client")
+REPORT = output_path(ROOT, "external-agent-report.json")
 INSPECTOR_VERSION = "2.11.0"
 
 
@@ -115,7 +117,7 @@ def read_inspector(result):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", default="http://harbor.localhost:8080")
+    parser.add_argument("--base", default=console_url())
     parser.add_argument("--model", default="gemini-3.1-flash-lite")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--inspector-only", action="store_true")
@@ -128,11 +130,11 @@ def main():
     if args.prepare_only:
         print("Pinned Inspector and standalone agent are ready; no credentials or API calls used.")
         return 0
-    member = json.loads((ROOT / ".secrets" / "demo-member.json").read_text(encoding="utf-8-sig"))
+    member = json.loads(private_path(ROOT, "demo-member.json").read_text(encoding="utf-8-sig"))
     gemini_key = (
         ""
         if args.inspector_only
-        else (ROOT / ".secrets" / "gemini-api-key.txt").read_text(encoding="utf-8-sig").strip()
+        else private_path(ROOT, "gemini-api-key.txt").read_text(encoding="utf-8-sig").strip()
     )
     report = {
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -334,7 +336,7 @@ def main():
         print("PASS", check["name"])
     print(
         "PASS" if report["passed"] else "FAIL",
-        "external verification; see .runtime/external-agent-report.json",
+        f"external verification; see {REPORT}",
     )
     return 0 if report["passed"] else 1
 

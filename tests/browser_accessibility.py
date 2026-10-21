@@ -6,15 +6,16 @@ All API responses are browser-local fixtures. No credentials or LLM calls are us
 
 import asyncio
 import json
-import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from playwright.async_api import async_playwright, expect
 
+from tests.deployed_config import console_url, output_path
+
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("HARBOR_URL", "http://127.0.0.1:4173").rstrip("/")
-OUT = ROOT / ".runtime" / "accessibility"
+BASE = console_url("http://127.0.0.1:4173")
+OUT = output_path(ROOT, "accessibility")
 WIDTHS = [320, 390, 430, 768, 1440]
 
 
@@ -52,7 +53,7 @@ async def text_contrast(locator, pseudo=None):
 
 async def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    report = {"complete": False, "scope": "fixture-accessibility", "checks": []}
+    report = {"complete": False, "base": BASE, "scope": "fixture-accessibility", "checks": []}
     errors = []
     unexpected = []
     role = "admin"

@@ -1,7 +1,8 @@
 """Real browser journey: chat write, COD checkout, WP admin, then today's orders.
 
 Creates a product and a test order. Credentials and recordings stay Git-excluded.
-Run only against this project's local demonstration cluster.
+Run only against this project's demonstration deployment. See deployed_config.py
+for public target, private credentials and separate evidence overrides.
 """
 
 import argparse
@@ -19,11 +20,12 @@ from mcp.client.streamable_http import streamable_http_client
 from playwright.async_api import async_playwright, expect
 
 from tests.acceptance import Acceptance, unpack
+from tests.deployed_config import console_url, credentials_path, output_path, store_url
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = "http://harbor.localhost:8080"
-STORE = "http://store.localhost:8080"
-OUT = ROOT / ".runtime/browser"
+BASE = console_url()
+STORE = store_url()
+OUT = output_path(ROOT, "browser")
 
 
 async def login(page, email, password):
@@ -111,11 +113,13 @@ async def verify_order_tools(credentials, order_id, product_id):
 
 async def main(audit_only=False):
     OUT.mkdir(parents=True, exist_ok=True)
-    credentials = json.loads((ROOT / ".secrets/development.json").read_text("utf-8-sig"))
+    credentials = json.loads(credentials_path(ROOT).read_text("utf-8-sig"))
     # A narrower Activity check must never certify an interrupted full journey.
     report_path = OUT / ("audit-report.json" if audit_only else "report.json")
     report = {
         "timestamp": time.time(),
+        "base": BASE,
+        "store": STORE,
         "scope": "activity-only" if audit_only else "full-journey",
         "checks": [],
         "complete": False,

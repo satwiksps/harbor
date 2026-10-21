@@ -13,8 +13,10 @@ from pathlib import Path
 import httpx
 from playwright.async_api import async_playwright, expect
 
+from tests.deployed_config import console_url, credentials_path, output_path
+
 ROOT = Path(__file__).resolve().parents[1]
-BASE = "http://harbor.localhost:8080"
+BASE = console_url()
 STAGE = "setup"
 
 
@@ -53,7 +55,7 @@ async def accept(page, url, password):
 
 async def main():
     global STAGE
-    credentials = json.loads((ROOT / ".secrets/development.json").read_text("utf-8-sig"))
+    credentials = json.loads(credentials_path(ROOT).read_text("utf-8-sig"))
     suffix = secrets.token_hex(5)
     emails = {f"invite-browser-{suffix}-{i}@example.test" for i in range(2)}
     password = secrets.token_urlsafe(24)
@@ -247,10 +249,10 @@ async def main():
                     )
                     response.raise_for_status()
             await admin.post("/api/auth/logout")
-    output = ROOT / ".runtime/browser-invitation"
+    output = output_path(ROOT, "browser-invitation")
     output.mkdir(parents=True, exist_ok=True)
     (output / "report.json").write_text(
-        json.dumps({"complete": True, "checks": checks}, indent=2), encoding="utf-8"
+        json.dumps({"complete": True, "base": BASE, "checks": checks}, indent=2), encoding="utf-8"
     )
 
 

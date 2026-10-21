@@ -6,22 +6,23 @@ Screenshots and reports remain in the Git-excluded .runtime directory.
 
 import asyncio
 import json
-import os
 from pathlib import Path
 
 from playwright.async_api import async_playwright, expect
 
+from tests.deployed_config import console_url, credentials_path, output_path, store_url
+
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("HARBOR_URL", "http://harbor.localhost:8080").rstrip("/")
-STORE = "http://store.localhost:8080"
-OUT = ROOT / ".runtime" / "visual-audit"
+BASE = console_url()
+STORE = store_url()
+OUT = output_path(ROOT, "visual-audit")
 STAGE = "setup"
 
 
 async def main():
     global STAGE
     OUT.mkdir(parents=True, exist_ok=True)
-    credentials = json.loads((ROOT / ".secrets/development.json").read_text("utf-8-sig"))
+    credentials = json.loads(credentials_path(ROOT).read_text("utf-8-sig"))
     layouts = []
     errors = []
     complete = False
@@ -137,7 +138,13 @@ async def main():
         finally:
             (OUT / "report.json").write_text(
                 json.dumps(
-                    {"complete": complete, "layouts": layouts, "javascript_errors": errors},
+                    {
+                        "complete": complete,
+                        "base": BASE,
+                        "store": STORE,
+                        "layouts": layouts,
+                        "javascript_errors": errors,
+                    },
                     indent=2,
                 ),
                 encoding="utf-8",

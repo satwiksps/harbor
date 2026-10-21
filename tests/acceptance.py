@@ -17,6 +17,8 @@ import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+from tests.deployed_config import console_url, credentials_path, output_path, private_path
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -51,9 +53,7 @@ class Acceptance:
         return http, response.json()["user"]
 
     async def run(self, chat=False):
-        credentials = json.loads(
-            (ROOT / ".secrets/development.json").read_text(encoding="utf-8-sig")
-        )
+        credentials = json.loads(credentials_path(ROOT).read_text(encoding="utf-8-sig"))
         admin, admin_user = await self.login(
             credentials["admin_email"], credentials["admin_password"]
         )
@@ -61,6 +61,7 @@ class Acceptance:
         keys = []
         disabled = None
         added_server = None
+        complete = False
         try:
             self.record("Administrator session and CSRF")
             for _ in range(40):
@@ -93,7 +94,7 @@ class Acceptance:
                 )
                 accepted.raise_for_status()
             member, member_user = await self.login(email, password)
-            (ROOT / ".secrets/demo-member.json").write_text(
+            private_path(ROOT, "demo-member.json").write_text(
                 json.dumps({"email": email, "password": password, "id": member_user["id"]}),
                 encoding="utf-8",
             )
@@ -293,6 +294,7 @@ class Acceptance:
             assert totals["latency_samples"] > 0
             assert 0 <= totals["p50_latency_ms"] <= totals["p95_latency_ms"]
             self.record("Activity metrics match live calls and preserve member isolation")
+            complete = True
         finally:
             if added_server:
                 await admin.delete(f"/api/servers/{added_server}")
@@ -303,17 +305,26 @@ class Acceptance:
             if member:
                 await member.aclose()
             await admin.aclose()
-            path = ROOT / ".runtime/acceptance.json"
-            path.parent.mkdir(exist_ok=True)
+            path = output_path(ROOT, "acceptance.json")
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(
-                json.dumps({"timestamp": time.time(), "checks": self.report}, indent=2),
+                json.dumps(
+                    {
+                        "timestamp": time.time(),
+                        "base": self.base,
+                        "complete": complete,
+                        "chat_requested": chat,
+                        "checks": self.report,
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default="http://harbor.localhost:8080")
+    parser.add_argument("--base", default=console_url())
     parser.add_argument("--chat", action="store_true")
     args = parser.parse_args()
     asyncio.run(Acceptance(args.base).run(args.chat))

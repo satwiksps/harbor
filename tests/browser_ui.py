@@ -6,20 +6,21 @@ inside this test browser, so no LLM quota or real connection changes are require
 
 import asyncio
 import json
-import os
 from pathlib import Path
 
 from playwright.async_api import async_playwright, expect
 
+from tests.deployed_config import console_url, credentials_path, output_path
+
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("HARBOR_URL", "http://harbor.localhost:8080").rstrip("/")
+BASE = console_url()
 STAGE = "setup"
 
 
 async def main():
     global STAGE
     checks = []
-    credentials = json.loads((ROOT / ".secrets/development.json").read_text("utf-8-sig"))
+    credentials = json.loads(credentials_path(ROOT).read_text("utf-8-sig"))
 
     def record(name):
         checks.append(name)
@@ -276,10 +277,12 @@ async def main():
         finally:
             await context.close()
             await browser.close()
-    output = ROOT / ".runtime" / "browser-ui"
+    output = output_path(ROOT, "browser-ui")
     output.mkdir(parents=True, exist_ok=True)
     (output / "report.json").write_text(
-        json.dumps({"complete": True, "response_fixtures": True, "checks": checks}, indent=2),
+        json.dumps(
+            {"complete": True, "base": BASE, "response_fixtures": True, "checks": checks}, indent=2
+        ),
         encoding="utf-8",
     )
 

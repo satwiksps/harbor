@@ -6,17 +6,17 @@ uv run python -m tests.browser_observability. All API calls are intercepted.
 
 import asyncio
 import json
-import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from playwright.async_api import async_playwright, expect
 
 from tests.browser_accessibility import text_contrast
+from tests.deployed_config import console_url, output_path
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = os.getenv("HARBOR_URL", "http://127.0.0.1:5175").rstrip("/")
-OUT = ROOT / ".runtime" / "observability"
+BASE = console_url("http://127.0.0.1:5175")
+OUT = output_path(ROOT, "observability")
 OUTCOMES = [
     "success",
     "tool_error",
@@ -46,7 +46,7 @@ def metrics(**overrides):
 
 async def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    report = {"complete": False, "scope": "fixture-observability", "checks": []}
+    report = {"complete": False, "base": BASE, "scope": "fixture-observability", "checks": []}
     role = "admin"
     mode = "populated"
     summary_requests = []
