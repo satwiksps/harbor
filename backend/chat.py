@@ -7,6 +7,7 @@ from datetime import timedelta
 import httpx2
 from fastapi import HTTPException
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
@@ -142,9 +143,20 @@ class ChatAgent:
                             if declarations else None
                         )
                         declared = dict(catalog.active)
-                        response = await client.models.generate_content(
-                            model=self.settings.gemini_model, contents=contents, config=config
-                        )
+                        # Retry only an explicit provider 503, never the surrounding tool loop.
+                        # SDK retries also include transport failures, so keep those disabled.
+                        for attempt in range(2):
+                            try:
+                                response = await client.models.generate_content(
+                                    model=self.settings.gemini_model,
+                                    contents=contents,
+                                    config=config,
+                                )
+                                break
+                            except genai_errors.ServerError as exc:
+                                if exc.code != 503 or attempt:
+                                    raise
+                                await asyncio.sleep(1)
                         if not response.candidates or not response.candidates[0].content:
                             raise HTTPException(
                                 502,
@@ -259,6 +271,10 @@ class ChatAgent:
             if status == 429:
                 raise HTTPException(
                     429, "Gemini free-tier quota is exhausted. Wait and retry."
+                ) from None
+            if status == 503:
+                raise HTTPException(
+                    503, "The chat provider is temporarily unavailable. Please try again shortly."
                 ) from None
             if status in {408, 504}:
                 raise HTTPException(
