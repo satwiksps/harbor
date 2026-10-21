@@ -20,11 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip \
     && mkdir -p /usr/src/wordpress/wp-content/mu-plugins /var/run/apache2 /var/lock/apache2 /opt/harbor \
     && chown -R www-data:www-data /var/run/apache2 /var/lock/apache2 /usr/src/wordpress
 COPY --from=cli /usr/local/bin/wp /usr/local/bin/wp
+COPY --chmod=644 installer-deny.conf /etc/apache2/conf-available/harbor-installer-deny.conf
 COPY --chown=33:33 bootstrap.sh seed.php migrate-brand.php sync-packaged.sh database-ready.php /opt/harbor/
 COPY --chown=33:33 health.php /usr/src/wordpress/health.php
 COPY --chown=33:33 harbor-theme.php /usr/src/wordpress/wp-content/mu-plugins/harbor-theme.php
 COPY --chown=33:33 assets/ /usr/src/wordpress/wp-content/harbor-assets/
-RUN chmod 755 /opt/harbor/bootstrap.sh \
+RUN a2enconf harbor-installer-deny \
+    && chmod 755 /opt/harbor/bootstrap.sh \
     && php -l /opt/harbor/seed.php \
     && php -l /opt/harbor/migrate-brand.php \
     && php -l /opt/harbor/database-ready.php \
