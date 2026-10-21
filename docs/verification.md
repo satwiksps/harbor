@@ -6,7 +6,7 @@ Unit tests, fixture-driven browser regressions and live end-to-end checks establ
 
 ## Public deployment, 21 October 2026
 
-The [console](https://harbor.140-245-235-253.sslip.io/) and [store](https://store.140-245-235-253.sslip.io/) run source `87ae800` as Helm revision 3 on one AMD Oracle VM. The account remains on Free Tier; this E5 instance consumes expiring trial credits and is not an Always Free instance. See [hosting configuration](operations.md#vps-configuration) for the exact versions and limits.
+The initial public console and store deployment used source `87ae800` as Helm revision 3 on one AMD Oracle VM. The checks below ran against the original `sslip.io` hostnames; the current public addresses are listed in [operations](operations.md#vps-configuration). The account remains on Free Tier; this E5 instance consumes expiring trial credits and is not an Always Free instance. See [hosting configuration](operations.md#vps-configuration) for the exact versions and limits.
 
 | Check | Observed result |
 | --- | --- |

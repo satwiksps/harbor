@@ -12,7 +12,9 @@ Use **Streamable HTTP** as the transport. A client must support a bearer Authori
 4. Connect and list tools. The bundled setup exposes seven member tools across three upstreams. Names include the upstream slug and a stable suffix, so the two tools named `search` remain distinct.
 5. Call the discovered `list_products` tool using its complete returned name, then check **Activity** for the call under your member identity.
 
-The local URL works only from the computer running the cluster. A remote client needs a separately deployed HTTPS address; the documentation site is not an MCP endpoint.
+The local URL works only from the computer running the cluster. For the hosted deployment, replace it with `https://harbor.satwiksps.site/mcp` in the examples below and use a key created in that deployment. The documentation site is not an MCP endpoint.
+
+After a hostname change, update the client's configured URL directly. Existing gateway keys remain valid, but clients may drop Authorization headers when following redirects to another hostname.
 
 Use a member key for read-only clients. An administrator key can invoke write tools directly; dashboard chat confirmations do not apply to external calls.
 

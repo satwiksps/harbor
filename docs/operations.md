@@ -95,7 +95,7 @@ The tested store image pins WordPress 7.1.3, PHP 8.3, WooCommerce 11.2.1, Storef
 
 ## VPS configuration
 
-The [public console](https://harbor.140-245-235-253.sslip.io/) and [storefront](https://store.140-245-235-253.sslip.io/) run on one Oracle VM using the same Harbor chart as the local installation.
+The [public console](https://harbor.satwiksps.site/) and [storefront](https://store.harbor.satwiksps.site/) run on one Oracle VM using the same Harbor chart as the local installation.
 
 | Setting | Deployed configuration |
 | --- | --- |
@@ -117,7 +117,17 @@ Always Free Ampere capacity was unavailable when this VM was created. A later mo
 
 Use one VM and its existing public address, without an external cloud load balancer. In the cloud firewall allow TCP 80/443 from the internet and TCP 22 only from the operator's current public IP. Keep 6443, database ports and upstream ports closed to the internet. SSH provides the administration path. Inspect the Ubuntu host firewall too: retain Oracle's existing link-local and storage rules, then permit the web ports and k3s pod forwarding. Do not flush the firewall or use UFW to edit an Oracle Ubuntu image's rules. See [Oracle's essential firewall rules](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm#Essential_Firewall_Rules).
 
-Use two DNS names pointing to the VM. Without a purchased domain, `harbor.PUBLIC-IP-WITH-DASHES.sslip.io` and `store.PUBLIC-IP-WITH-DASHES.sslip.io` resolve to the embedded address. The service supports individual Let's Encrypt certificates through HTTP-01. It is a shared external DNS dependency, and changing the VM address changes these hostnames. Verify both names resolve correctly before requesting a certificate. See [sslip.io's DNS and TLS documentation](https://sslip.io/).
+The deployment uses three subdomains of an existing domain. Console and store DNS records point to the VM's public IPv4 address; documentation is hosted separately on Cloudflare Pages:
+
+| DNS host relative to `satwiksps.site` | Type | Destination |
+| --- | --- | --- |
+| `harbor` | A | VM public IPv4 address |
+| `store.harbor` | A | VM public IPv4 address |
+| `docs.harbor` | CNAME | `useharbor.pages.dev` |
+
+The root and `www` records continue serving the portfolio. Keep these records unchanged when editing Harbor's subdomains. Verify both application names resolve to the VM before requesting their Let's Encrypt HTTP-01 certificate. Adding these subdomains requires no separate domain purchase; the existing domain still needs renewal. Cloudflare manages the documentation certificate separately, as described in [documentation hosting](documentation.md#hosting-and-publication).
+
+A future VM move can retain the same application names by updating their A records after restoring and testing the destination. Changing the application hostname also requires updating ingress hosts, public URLs and WordPress's stored URLs before checking redirects, sign-in, invitations, checkout and external clients.
 
 On a fresh Ubuntu VM, install Docker only as an image builder, plus Python 3, curl and CA certificates. Keep k3s on its own containerd runtime. Docker can change the host's FORWARD policy, so inspect the resulting rules and verify external HTTP traffic after installation. Do not expose the Docker API.
 

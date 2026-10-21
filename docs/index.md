@@ -6,7 +6,7 @@ Harbor lets a team use one WooCommerce store through a shared tool gateway. An a
 
 For example, a member can read today's orders and ask for a shipping estimate. An administrator can also create a product, with an approval step in dashboard chat. Both users' tool calls appear in Activity.
 
-Open the [live console](https://harbor.140-245-235-253.sslip.io/) with an invited team account, or browse the [demo storefront](https://store.140-245-235-253.sslip.io/). Both run on the same single-node deployment described in [operations](operations.md#vps-configuration).
+Open the [live console](https://harbor.satwiksps.site/) with an invited team account, or browse the [demo storefront](https://store.harbor.satwiksps.site/). Both run on the same single-node deployment described in [operations](operations.md#vps-configuration).
 
 ## Start here
 

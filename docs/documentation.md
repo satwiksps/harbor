@@ -2,7 +2,7 @@
 
 The documentation lives alongside the application in the private main repository. MkDocs and the Material theme turn `docs/` into a static website. `mkdocs.yml` defines navigation, styling, search and link validation. Documentation changes can be reviewed in the same commit as the behavior they describe.
 
-Cloudflare Pages builds the [documentation website](https://useharbor.pages.dev/) from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
+Cloudflare Pages builds the [documentation website](https://docs.harbor.satwiksps.site/) from this repository's `main` branch and publishes only the generated documentation directory. The documentation environment does not need Docker, a running cluster, application dependencies or application credentials.
 
 ## Preview locally
 
@@ -61,11 +61,13 @@ Configure the Pages project with these values:
 | Build output directory | `.runtime/docs-site` |
 | `PYTHON_VERSION` | `3.12` |
 | `SKIP_DEPENDENCY_INSTALL` | `1` |
-| `DOCS_SITE_URL` | `https://useharbor.pages.dev/` |
+| `DOCS_SITE_URL` | `https://docs.harbor.satwiksps.site/` |
 
 The custom build command installs only the locked documentation dependencies. `SKIP_DEPENDENCY_INSTALL` prevents automatic installation of the application's dependency set. See Cloudflare's [build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [dependency installation setting](https://developers.cloudflare.com/pages/configuration/build-image/#skip-dependency-install).
 
-MkDocs uses `DOCS_SITE_URL` for canonical URLs. Local builds can leave it unset. If the site moves, update this value and the README links after confirming the new production address. Do not substitute a deployment-specific preview URL for the stable site address. Automatic preview builds are disabled so unmerged branches do not publish additional copies of the documentation.
+Add `docs.harbor.satwiksps.site` in the Pages project's **Custom domains** settings, then create the `docs.harbor` CNAME pointing to `useharbor.pages.dev` at the domain's existing DNS provider. The portfolio's root and `www` records stay unchanged. Wait for Pages to report the custom domain active and verify its HTTPS certificate. Adding only a DNS record without associating the domain with the Pages project is not enough. See Cloudflare's [custom-domain setup](https://developers.cloudflare.com/pages/configuration/custom-domains/#add-a-custom-subdomain).
+
+MkDocs uses `DOCS_SITE_URL` for canonical URLs. Local builds can leave it unset. If the site moves, update this value and the README links after confirming the new production address, then deploy again so the generated canonical links use the new address. Do not substitute a deployment-specific preview URL for the stable site address. Automatic preview builds are disabled so unmerged branches do not publish additional copies of the documentation.
 
 For [build watch paths](https://developers.cloudflare.com/pages/configuration/build-watch-paths/), include `docs/*`, `mkdocs.yml` and `scripts/build-docs.py`. A single trailing `*` includes nested paths in Pages. These paths cover content, assets, dependency locks and build validation, while ordinary application-only changes can skip a website build. Update the list if a new file outside these paths affects the documentation output.
 

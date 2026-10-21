@@ -97,8 +97,8 @@ uv run python -m tests.browser_acceptance
 Use the public console and store URLs together. Copy that server's private `development.json` into a protected, Git-excluded local directory; the example uses `.secrets/oci/production`. This file contains the live credentials, so do not substitute the local development file or publish it with the reports.
 
 ```powershell
-$env:HARBOR_URL = 'https://harbor.140-245-235-253.sslip.io'
-$env:HARBOR_STORE_URL = 'https://store.140-245-235-253.sslip.io'
+$env:HARBOR_URL = 'https://harbor.satwiksps.site'
+$env:HARBOR_STORE_URL = 'https://store.harbor.satwiksps.site'
 $env:HARBOR_TEST_CREDENTIALS = (Resolve-Path '.secrets/oci/production/development.json').Path
 $env:HARBOR_TEST_OUTPUT_DIR = Join-Path (Get-Location) ('.runtime/public-' + (Get-Date -Format yyyyMMdd-HHmmss))
 uv run python -m tests.acceptance
