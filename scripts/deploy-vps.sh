@@ -25,7 +25,43 @@ for command in kubectl k3s helm python3; do command -v "$command" >/dev/null; do
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 test -r "$KUBECONFIG"
 cd "$(dirname "$0")/.."
-mkdir -p .runtime .secrets
+mkdir -p .runtime
+kubectl -n harbor get ingress harbor --ignore-not-found -o json > .runtime/vps-ingress.json
+python3 - "$console_host" "$store_host" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+console, store = sys.argv[1:]
+raw = Path('.runtime/vps-ingress.json').read_text().strip()
+tls = [{'secretName': 'harbor-ingress-tls', 'hosts': [console, store]}]
+if raw:
+    spec = json.loads(raw)['spec']
+    routes = {
+        rule.get('host'): {path['backend']['service']['name'] for path in rule.get('http', {}).get('paths', [])}
+        for rule in spec.get('rules', [])
+    }
+    if routes != {console: {'gateway', 'dashboard'}, store: {'wordpress'}}:
+        raise SystemExit('Existing ingress hosts or service roles differ. Use a controlled domain migration before deploying; no resources or credentials were changed.')
+    tls = spec.get('tls')
+    if not isinstance(tls, list) or not tls:
+        raise SystemExit('Existing ingress has no TLS configuration. Restore its certificates before deploying.')
+    covered = set()
+    for entry in tls:
+        if not isinstance(entry, dict):
+            raise SystemExit('Existing ingress has an invalid TLS entry.')
+        name, hosts = entry.get('secretName'), entry.get('hosts')
+        if not isinstance(name, str) or not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?', name):
+            raise SystemExit('Existing ingress has an invalid TLS Secret name.')
+        if not isinstance(hosts, list) or not hosts or any(not isinstance(host, str) or not host for host in hosts):
+            raise SystemExit('Existing ingress has invalid TLS hostnames.')
+        covered.update(hosts)
+    if not {console, store}.issubset(covered):
+        raise SystemExit('Existing ingress TLS does not cover both requested hosts. Complete the domain migration before deploying.')
+Path('.runtime/vps-tls.json').write_text(json.dumps(tls) + '\n')
+PY
+mkdir -p .secrets
 chmod 700 .secrets
 kubectl get nodes -o json > .runtime/vps-nodes.json
 python3 - <<'PY'
@@ -69,7 +105,7 @@ values = {
     'ingress': {
         'consoleHost': console, 'storeHost': store,
         'annotations': {'cert-manager.io/issuer': 'harbor-letsencrypt', 'traefik.ingress.kubernetes.io/router.entrypoints': 'websecure'},
-        'tls': [{'secretName': 'harbor-ingress-tls', 'hosts': [console, store]}],
+        'tls': json.loads(Path('.runtime/vps-tls.json').read_text()),
     },
     'urls': {'console': f'https://{console}', 'store': f'https://{store}'},
     'gateway': {'adminEmail': email, 'trustedProxyCidrs': pod_cidrs, 'secureCookies': True},
@@ -99,6 +135,9 @@ helm lint deploy/chart -f deploy/values-prod.yaml -f .runtime/values-vps.json --
 helm upgrade --install harbor deploy/chart -n harbor -f deploy/values-prod.yaml -f .runtime/values-vps.json \
   --set-string "networkPolicy.apiServerCidr=$api_ip/32" --wait --timeout 15m
 kubectl -n harbor wait --for=condition=complete job/wordpress-bootstrap --timeout=600s
-kubectl -n harbor wait --for=condition=Ready certificate/harbor-ingress-tls --timeout=600s
+certificates=$(python3 -c 'import json; print("\n".join(dict.fromkeys(item["secretName"] for item in json.load(open(".runtime/values-vps.json"))["ingress"]["tls"])))')
+while IFS= read -r certificate; do
+  kubectl -n harbor wait --for=condition=Ready "certificate/$certificate" --timeout=600s
+done <<< "$certificates"
 kubectl -n harbor get deployments,pvc,certificate
 printf 'Deployed https://%s and https://%s. Run the public acceptance checks before sharing.\n' "$console_host" "$store_host"
