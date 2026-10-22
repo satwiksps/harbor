@@ -19,17 +19,17 @@
     <td align="center" valign="top" width="33%">
       <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture><br>
       <strong>Store</strong><br>
-      <a href="https://store.harbor.satwiksps.site/"><sub>https://<wbr>store.<wbr>harbor.<wbr>satwiksps.<wbr>site/</sub></a>
+      <a href="https://store.harbor.satwiksps.site/">https://<wbr>store.<wbr>harbor.<wbr>satwiksps.<wbr>site/</a>
     </td>
     <td align="center" valign="top" width="33%">
       <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture><br>
       <strong>Console</strong><br>
-      <a href="https://harbor.satwiksps.site/"><sub>https://<wbr>harbor.<wbr>satwiksps.<wbr>site/</sub></a>
+      <a href="https://harbor.satwiksps.site/">https://<wbr>harbor.<wbr>satwiksps.<wbr>site/</a>
     </td>
     <td align="center" valign="top" width="33%">
       <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture><br>
       <strong>Docs</strong><br>
-      <a href="https://docs.harbor.satwiksps.site/"><sub>https://<wbr>docs.<wbr>harbor.<wbr>satwiksps.<wbr>site/</sub></a>
+      <a href="https://docs.harbor.satwiksps.site/">https://<wbr>docs.<wbr>harbor.<wbr>satwiksps.<wbr>site/</a>
     </td>
   </tr>
 </table>
