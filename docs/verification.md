@@ -4,6 +4,24 @@ This page records completed source, browser fixture, local k3d and public VPS ch
 
 Unit tests, fixture-driven browser regressions and live end-to-end checks establish different things. A passing fixture check does not prove that Gemini, checkout or a restored database works. Live checks use synthetic data; only checks that call Gemini consume provider quota.
 
+## Storefront and dashboard review, 23 October 2026
+
+Three review rounds covered the original public interface, a local WordPress candidate, and the deployed changes. The store now has a compact header with a live cart count, aligned catalog actions, responsive cart and checkout layouts, and consistent forms and feedback. The review also corrected product-image zoom, search-result headings, floating product navigation, small touch targets and dashboard table readability.
+
+| Round | Scope and observed result |
+| --- | --- |
+| 1. Baseline | Manually followed catalog, add-to-cart, cart and checkout flows. Inspected dashboard tables and existing responsive captures. Found touching cart actions, weak cart/checkout hierarchy and several small-screen readability issues |
+| 2. Local candidate | 29 complete storefront checks passed across 1440, 390 and 320 px. A separate 18-view pass covered product details, missing images, search and account pages at desktop, tablet and mobile sizes. Reviewed screenshots and corrected the remaining spacing and navigation defects |
+| 3. Public release | 31 storefront checks and 51 responsive captures passed with no document-wide overflow or JavaScript exceptions. Nine dashboard UI regressions, 40 accessibility checks and ten Activity checks also passed. The dashboard scenario checks use browser fixtures; storefront shopping and checkout used the live store |
+| Saved order | One public demo checkout created order 25: notebook quantity one, INR 349 plus INR 59 shipping, total INR 408. The browser receipt and an independent server read agreed; the cart was empty afterward |
+| Source checks | 214 unit tests passed, with three PostgreSQL cases and one Linux-only case skipped on Windows. The dashboard production build, PHP syntax checks, five branding/shipping checks and chart validation passed |
+
+Helm revision 7 updates only the WordPress and dashboard images from source `713e2ca`. The gateway and upstream images remain `87ae800`. A consistent private backup was verified and copied off the VM before deployment. Existing storage, credentials, domains and both TLS entries were retained. All eight deployments and the WordPress bootstrap job were healthy after the upgrade. No cloud resource or paid-plan change was made.
+
+Three products created by earlier acceptance tests were hidden from catalog listings after checking their exact IDs, SKUs and retained orders. Their direct URLs and order records remain available. The visible catalog contains the three starter products.
+
+The first local checkout reached its receipt but the test failed while reading an AJAX response after navigation. Order 29 was verified independently and its existing receipt reopened; it was not submitted again. The harness now verifies the receipt directly and records an order ID before later assertions. The final public run completed successfully. These UI checks did not call Gemini or retest provider availability. Detailed screenshots, failed reports and order evidence remain private under `.runtime`.
+
 ## Custom domains, 21 October 2026
 
 The console, store and documentation moved to the [current public addresses](operations.md#vps-configuration). Helm revision 6 retains the `87ae800` application images and existing data. A consistent backup was taken before changing hosts and copied off the VM with matching checksums. The portfolio's root and `www` DNS records were unchanged.
