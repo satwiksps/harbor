@@ -4,6 +4,24 @@ This page records completed source, browser fixture, local k3d and public VPS ch
 
 Unit tests, fixture-driven browser regressions and live end-to-end checks establish different things. A passing fixture check does not prove that Gemini, checkout or a restored database works. Live checks use synthetic data; only checks that call Gemini consume provider quota.
 
+## Console design and usability review, 23 October 2026
+
+Three review rounds covered administrator and member workflows across Chat, Connections, Team/API keys and Activity. Changes improve text contrast, spacing, navigation, touch targets, narrow-screen tables and dialogs. Chat now formats replies, preserves reading position and returns focus after approval actions. Tool search preserves unsaved permission edits, including rows hidden by the current search.
+
+| Round | Scope and observed result |
+| --- | --- |
+| 1. Baseline | Inspected 62 fixture views from 320 to 1440 px. Found small text and controls, crowded tablet tables, clipped actions and unformatted assistant replies |
+| 2. Candidate | Repeated the 62 views after fixes. All 40 accessibility, ten Activity and 11 new console interaction checks passed. Screenshot review caught remaining tablet alignment and touch-target issues; a regression also caught model-generated fragment links changing the active console page |
+| 3. Public release | The same 62 views, 40 accessibility checks, ten Activity checks and 11 console interaction checks passed on the deployed bundle. Nine existing UI scenarios also passed. These scenarios use controlled API responses; the existing UI harness uses real sign-in |
+| Real sessions | Separately, 25 checks and 42 responsive captures passed with real administrator and member sessions. Verified all four pages, three connected catalogs, unsubmitted dialogs, role-specific controls, sign-out/relogin and the published console guide. No JavaScript errors, failed API responses or document-wide overflow were observed |
+| Source checks | 214 Python tests passed, with three PostgreSQL cases and one Linux-only case skipped on Windows. Python lint, the TypeScript/Vite build and dependency audit passed. All CI jobs passed for source `813eddf` |
+
+The new console regression harness covers Markdown safety, image links without automatic remote loading, reading position, approval focus, tool filtering with unsaved edits and management actions at phone/tablet widths. See the [development guide](development.md#run-deployed-checks-deliberately) for the fixture commands.
+
+Helm revision 8 changes only the dashboard image to `harbor-dashboard:console-813eddf37ee6`. All eight deployments are healthy; the other seven deployment specifications, three persistent volumes, application/upstream Secret identities and both TLS entries were retained. Migration and store-bootstrap hooks were skipped because this release changes only the frontend. The saved deployment values now reference the new image. No cloud resource or paid-plan change was made.
+
+The live session check made only authentication writes. It did not create invitations or keys, change permissions, call Gemini or repeat store checkout. Provider availability remains outside this UI review's evidence. Detailed screenshots, initial failed harness reports and deployment comparisons remain private under `.runtime`.
+
 ## Storefront and dashboard review, 23 October 2026
 
 Three review rounds covered the original public interface, a local WordPress candidate, and the deployed changes. The store now has a compact header with a live cart count, aligned catalog actions, responsive cart and checkout layouts, and consistent forms and feedback. The review also corrected product-image zoom, search-result headings, floating product navigation, small touch targets and dashboard table readability.

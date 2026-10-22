@@ -72,16 +72,17 @@ The acceptance harness calls all three upstreams over MCP and checks hidden writ
 
 The invitation check accepts real invitations and changes the browser session. Use a separate browser profile for an interactive administrator session while it runs.
 
-For accessibility checks with browser-local API fixtures:
+For console checks with browser-local API fixtures:
 
 ```powershell
 $env:HARBOR_URL = 'http://harbor.localhost:8080'
 uv run python -m tests.browser_accessibility
 uv run python -m tests.browser_observability
+uv run python -m tests.browser_console
 Remove-Item Env:HARBOR_URL
 ```
 
-These harnesses can also target a running frontend preview. They do not send application mutations or provider requests. The Activity checks cover metrics, filtering, personal scope and failure recovery.
+These harnesses can also target a running frontend preview. They do not send application mutations or provider requests. The Activity checks cover metrics, filtering, personal scope and failure recovery. Console regressions cover formatted replies, unsafe Markdown, reading position, approval focus, tool search with unsaved edits, narrow management layouts and member controls.
 
 For the storefront, use the published starter bottle and notebook products:
 
@@ -127,7 +128,7 @@ The [verification record](verification.md) lists executed checks, their environm
 
 ## CI and scope
 
-The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL cases, recovery and credential-preparation guards, the dashboard build, and Activity/accessibility browser fixtures against that build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
+The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL cases, recovery and credential-preparation guards, the dashboard build, and Activity, accessibility and console interaction fixtures against that build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
 
 The system deliberately uses one store, one gateway replica and process-local rate limits. The [public deployment](operations.md#vps-configuration) uses TLS, secure cookies, cluster Secret encryption and protected backups. Production values remain a template that must be adapted for each target. Schema migrations are forward-only until an explicit rollback migration exists.
 

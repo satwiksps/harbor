@@ -26,6 +26,8 @@ Chat uses the tools available to the signed-in user. Start with a read, such as:
 
 > What products are in the store?
 
+The starter cards place a suggested question in the message box so you can edit it before sending. Replies support headings, lists, tables and code. Images appear as links. If you scroll back while a reply arrives, your reading position stays in place; use **Jump to latest** to return to the newest message.
+
 Tool calls and their results remain visible in the conversation. An administrator can propose a change:
 
 > Create a product called Field notebook priced at INR 249, SKU FIELD-NOTEBOOK-01.
@@ -73,17 +75,23 @@ Administrators manage upstreams and their tool permissions in **Connections**:
 3. Review each tool before granting **Read access**. **Write access** keeps it restricted to administrators and requires approval in dashboard chat.
 4. Save permission changes, then refresh the external client's catalog if it is already connected.
 
+Use the tool search inside a connection to find a tool by name or description. Filtering does not discard unsaved permission changes, including changes to rows hidden by the current search. The change count and **Save permissions** button show when a save is still needed.
+
 Connection status refreshes while the page is visible. Disabling a connection removes its tools from discovery; removing it also deletes the registration. Both preserve past activity. Stale direct calls are rejected even if a client retains a cached tool name. A blank credential field during editing preserves the existing credential; use the explicit removal option to clear it.
 
 Revoke a key in **Team & keys** or **My API keys** when it is no longer needed. Its next request fails, including requests on an initialized MCP transport. An operation that has already been dispatched may still finish. The system also prevents demoting or deactivating the last active administrator.
 
 The team list shows active members by default. Use **Show deactivated members** to inspect or reactivate an earlier account. Keys and invitations also have history controls, so completed records remain available without crowding the active view.
 
+On narrow screens, members, keys and activity entries appear as labeled cards with their actions visible. Open the navigation menu to switch pages. The sign-out button sits beside your account details at the bottom of the navigation.
+
 ## Read activity and recover from errors
 
 Use **Activity** to inspect tool calls, their outcomes and performance. Members see only their own activity; administrators can inspect the team or select a teammate. Connection and teammate filters apply to both the overview and history.
 
 The overview shows calls started within the last hour, 24 hours or seven days. It reports call counts, failure rate, median and p95 latency, with a breakdown by connection and outcome. **Refresh** updates both sections; the overview shows when it was measured. The history remains all time, and its outcome filter does not change the overview. Open **Details** for a call's request ID and error.
+
+Use **View history** at the top to jump directly to the call list. The per-connection metrics table can scroll sideways when the available width is limited.
 
 Failure rate counts connection errors, tool errors and timeouts out of completed calls, including successes. Denied, invalid, cancelled and in-progress calls count toward total activity but not failure rate or latency. Latency measures the gateway call, including waiting, connection setup and execution. It is not the upstream server's processing time alone. Sample counts show how many calls contributed; small samples can vary widely. **No data** means no eligible measurement, while an in-progress call has no final duration yet. This audit trail is separate from conversation history.
 
