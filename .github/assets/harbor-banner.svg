@@ -1,41 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title description">
-  <title id="title">Harbor</title>
-  <desc id="description">Harbor, a team MCP gateway. One connection branches through the Harbor mark to three tools.</desc>
-  <rect width="1280" height="360" rx="16" fill="#f3f2ed"/>
-  <rect x="0.5" y="0.5" width="1279" height="359" rx="15.5" fill="none" stroke="#d6d3c8"/>
-
-  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
-    <text x="70" y="85" fill="#545d56" font-size="14" font-weight="600" letter-spacing="2.8">TEAM MCP GATEWAY</text>
-    <text x="64" y="214" fill="#136b69" font-size="120" font-weight="600" letter-spacing="-5">Harbor</text>
-    <path d="M70 268h44" stroke="#136b69" stroke-width="3"/>
-    <text x="132" y="274" fill="#545d56" font-size="18" letter-spacing="0.3">Tools. Identity. Control.</text>
-  </g>
-
-  <g fill="none" stroke="#a7bdb3" stroke-width="2">
-    <path d="M653 180h107"/>
-    <path d="M840 180h77q18 0 18-18v-62q0-18 18-18h53"/>
-    <path d="M840 180h166"/>
-    <path d="M840 180h77q18 0 18 18v62q0 18 18 18h53"/>
-  </g>
-  <circle cx="641" cy="180" r="12" fill="#f3f2ed" stroke="#136b69" stroke-width="2"/>
-  <circle cx="641" cy="180" r="4" fill="#136b69"/>
-
-  <rect x="760" y="140" width="80" height="80" rx="24" fill="#136b69"/>
-  <path d="M786 164v32m28-32v32M786 180h28" fill="none" stroke="#f3f2ed" stroke-width="6" stroke-linecap="round"/>
-
-  <g fill="#fcfcf9" stroke="#d6d3c8">
-    <rect x="1006" y="50" width="204" height="64" rx="10"/>
-    <rect x="1006" y="148" width="204" height="64" rx="10"/>
-    <rect x="1006" y="246" width="204" height="64" rx="10"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="666" height="144" viewBox="0 0 666 144" role="img" aria-labelledby="title description">
+  <title id="title">HARBOR</title>
+  <desc id="description">Harbor, a team MCP gateway, in an original square-block wordmark on a transparent background.</desc>
   <g fill="#136b69">
-    <circle cx="1030" cy="82" r="4"/>
-    <circle cx="1030" cy="180" r="4"/>
-    <circle cx="1030" cy="278" r="4"/>
-  </g>
-  <g fill="#344c45" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" font-weight="500">
-    <text x="1048" y="89">Commerce</text>
-    <text x="1048" y="187">Policies</text>
-    <text x="1048" y="285">Shipping</text>
+    <path d="M18 9h17.2v17.2h-17.2zM90 9h17.2v17.2h-17.2zM18 27h17.2v17.2h-17.2zM90 27h17.2v17.2h-17.2zM18 45h17.2v17.2h-17.2zM90 45h17.2v17.2h-17.2zM18 63h17.2v17.2h-17.2zM36 63h17.2v17.2h-17.2zM54 63h17.2v17.2h-17.2zM72 63h17.2v17.2h-17.2zM90 63h17.2v17.2h-17.2zM18 81h17.2v17.2h-17.2zM90 81h17.2v17.2h-17.2zM18 99h17.2v17.2h-17.2zM90 99h17.2v17.2h-17.2zM18 117h17.2v17.2h-17.2zM90 117h17.2v17.2h-17.2z"/>
+    <path d="M144 9h17.2v17.2h-17.2zM162 9h17.2v17.2h-17.2zM180 9h17.2v17.2h-17.2zM126 27h17.2v17.2h-17.2zM198 27h17.2v17.2h-17.2zM126 45h17.2v17.2h-17.2zM198 45h17.2v17.2h-17.2zM126 63h17.2v17.2h-17.2zM144 63h17.2v17.2h-17.2zM162 63h17.2v17.2h-17.2zM180 63h17.2v17.2h-17.2zM198 63h17.2v17.2h-17.2zM126 81h17.2v17.2h-17.2zM198 81h17.2v17.2h-17.2zM126 99h17.2v17.2h-17.2zM198 99h17.2v17.2h-17.2zM126 117h17.2v17.2h-17.2zM198 117h17.2v17.2h-17.2z"/>
+    <path d="M234 9h17.2v17.2h-17.2zM252 9h17.2v17.2h-17.2zM270 9h17.2v17.2h-17.2zM288 9h17.2v17.2h-17.2zM234 27h17.2v17.2h-17.2zM306 27h17.2v17.2h-17.2zM234 45h17.2v17.2h-17.2zM306 45h17.2v17.2h-17.2zM234 63h17.2v17.2h-17.2zM252 63h17.2v17.2h-17.2zM270 63h17.2v17.2h-17.2zM288 63h17.2v17.2h-17.2zM234 81h17.2v17.2h-17.2zM270 81h17.2v17.2h-17.2zM234 99h17.2v17.2h-17.2zM288 99h17.2v17.2h-17.2zM234 117h17.2v17.2h-17.2zM306 117h17.2v17.2h-17.2z"/>
+    <path d="M342 9h17.2v17.2h-17.2zM360 9h17.2v17.2h-17.2zM378 9h17.2v17.2h-17.2zM396 9h17.2v17.2h-17.2zM342 27h17.2v17.2h-17.2zM414 27h17.2v17.2h-17.2zM342 45h17.2v17.2h-17.2zM414 45h17.2v17.2h-17.2zM342 63h17.2v17.2h-17.2zM360 63h17.2v17.2h-17.2zM378 63h17.2v17.2h-17.2zM396 63h17.2v17.2h-17.2zM342 81h17.2v17.2h-17.2zM414 81h17.2v17.2h-17.2zM342 99h17.2v17.2h-17.2zM414 99h17.2v17.2h-17.2zM342 117h17.2v17.2h-17.2zM360 117h17.2v17.2h-17.2zM378 117h17.2v17.2h-17.2zM396 117h17.2v17.2h-17.2z"/>
+    <path d="M468 9h17.2v17.2h-17.2zM486 9h17.2v17.2h-17.2zM504 9h17.2v17.2h-17.2zM450 27h17.2v17.2h-17.2zM522 27h17.2v17.2h-17.2zM450 45h17.2v17.2h-17.2zM522 45h17.2v17.2h-17.2zM450 63h17.2v17.2h-17.2zM522 63h17.2v17.2h-17.2zM450 81h17.2v17.2h-17.2zM522 81h17.2v17.2h-17.2zM450 99h17.2v17.2h-17.2zM522 99h17.2v17.2h-17.2zM468 117h17.2v17.2h-17.2zM486 117h17.2v17.2h-17.2zM504 117h17.2v17.2h-17.2z"/>
+    <path d="M558 9h17.2v17.2h-17.2zM576 9h17.2v17.2h-17.2zM594 9h17.2v17.2h-17.2zM612 9h17.2v17.2h-17.2zM558 27h17.2v17.2h-17.2zM630 27h17.2v17.2h-17.2zM558 45h17.2v17.2h-17.2zM630 45h17.2v17.2h-17.2zM558 63h17.2v17.2h-17.2zM576 63h17.2v17.2h-17.2zM594 63h17.2v17.2h-17.2zM612 63h17.2v17.2h-17.2zM558 81h17.2v17.2h-17.2zM594 81h17.2v17.2h-17.2zM558 99h17.2v17.2h-17.2zM612 99h17.2v17.2h-17.2zM558 117h17.2v17.2h-17.2zM630 117h17.2v17.2h-17.2z"/>
   </g>
 </svg>
