@@ -83,6 +83,14 @@ Remove-Item Env:HARBOR_URL
 
 These harnesses can also target a running frontend preview. They do not send application mutations or provider requests. The Activity checks cover metrics, filtering, personal scope and failure recovery.
 
+For the storefront, use the published starter bottle and notebook products:
+
+```powershell
+uv run python -m tests.browser_store
+```
+
+This check uses isolated shopping sessions at desktop and mobile widths. It covers keyboard add-to-cart, cart counts, quantities, remove and undo, empty carts, checkout validation and shipping totals. It needs neither an administrator login nor Gemini. By default it places no orders and empties its carts before closing. Add `--checkout` only on a demonstration deployment to place one synthetic cash-on-delivery order and verify the receipt. An uncertain checkout is recorded and never automatically resubmitted; inspect the store before rerunning that option. Reports and screenshots are saved in a separate private directory for each run.
+
 The following checks use a live Gemini API key and consume quota. The browser acceptance flow also submits a real test checkout:
 
 ```powershell
