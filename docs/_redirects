@@ -1,0 +1,11 @@
+# Retired documentation links lead to the current product guides.
+/verification /development/ 301
+/audit /threat-model/ 301
+/documentation /development/ 301
+/demo /user-guide/ 301
+/assets/application-release-evidence.json /development/ 301
+/assets/external-agent-evidence.json /external-clients/ 301
+/verification/* /development/ 301
+/audit/* /threat-model/ 301
+/documentation/* /development/ 301
+/demo/* /user-guide/ 301

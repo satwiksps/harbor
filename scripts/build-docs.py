@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).absolute().parents[1]
 PUBLIC_DOCS = {
+    "_redirects",
     "CONTRACT.md",
     "LICENSE",
     "brand-notes.md",
@@ -69,7 +70,7 @@ def validate_sources() -> None:
 
 
 def validate_output(output: Path) -> int:
-    for relative in ("index.html", "search/search_index.json", "robots.txt", "LICENSE"):
+    for relative in ("index.html", "search/search_index.json", "robots.txt", "LICENSE", "_redirects"):
         if not (output / relative).is_file():
             raise ValueError(f"Missing documentation output: {relative}")
     for relative in (
