@@ -56,7 +56,7 @@ jobs:
         working-directory: dashboard
       - name: Install browser test runtime
         run: uv run playwright install --with-deps chromium
-      - name: Check Activity and responsive accessibility
+      - name: Check console interactions and responsive accessibility
         env:
           HARBOR_URL: http://127.0.0.1:5175
         run: |
@@ -70,6 +70,7 @@ jobs:
           curl -fsS "$HARBOR_URL" > /dev/null
           uv run python -m tests.browser_observability
           uv run python -m tests.browser_accessibility
+          uv run python -m tests.browser_console
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
