@@ -54,6 +54,7 @@ p { margin-bottom: 20px; }
 .woocommerce-breadcrumb a:first-of-type::before { display: none; }
 .site-main > .harbor-eyebrow { margin: 48px 0 12px; color: var(--harbor-teal); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
 .woocommerce-products-header { padding: 0 0 30px !important; text-align: left !important; }
+.search .woocommerce-products-header { padding-top: 40px !important; }
 .woocommerce-products-header h1 { margin: 0 0 18px; }
 .harbor-intro { max-width: 540px; margin: 0; color: var(--harbor-muted); font-size: 16px; line-height: 1.75; }
 .storefront-full-width-content.woocommerce-cart .entry-header,
@@ -291,6 +292,7 @@ form.checkout > .woocommerce-NoticeGroup { grid-column: 1 / -1; }
   .site-content { padding-bottom: 40px; }
   .site-main > .harbor-eyebrow { margin-top: 32px; }
   .woocommerce-products-header { padding-bottom: 24px !important; }
+  .search .woocommerce-products-header { padding-top: 28px !important; }
   .harbor-intro { font-size: 15px; }
   .storefront-breadcrumb { padding-top: 20px; }
   .woocommerce-breadcrumb { margin-bottom: 18px; }
