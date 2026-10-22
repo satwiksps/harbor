@@ -115,6 +115,11 @@ export function Team({
           {members.error && (
             <ErrorBox message={members.error} retry={members.refresh} />
           )}{" "}
+          {!!visibleMembers?.length && (
+            <p className="table-scroll-hint">
+              Scroll sideways for roles, status and actions.
+            </p>
+          )}
           {members.loading && !members.data ? (
             <div className="loading-panel">
               <Spinner label="Loading teammates" />
@@ -261,6 +266,11 @@ export function Team({
           </div>
         )}
         {keys.error && <ErrorBox message={keys.error} retry={keys.refresh} />}{" "}
+        {!!visibleKeys?.length && (
+          <p className="table-scroll-hint">
+            Scroll sideways for key details and actions.
+          </p>
+        )}
         {keys.loading && !keys.data ? (
           <div className="loading-panel">
             <Spinner label="Loading API keys" />
@@ -567,6 +577,11 @@ function Invitations({ revision }: { revision: number }) {
       {invites.error && (
         <ErrorBox message={invites.error} retry={invites.refresh} />
       )}{" "}
+      {!!visibleInvites?.length && (
+        <p className="table-scroll-hint">
+          Scroll sideways for invitation details.
+        </p>
+      )}
       {invites.loading && !invites.data ? (
         <div className="loading-panel">
           <Spinner label="Loading invitations" />

@@ -1007,12 +1007,12 @@ code {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 13px;
   text-align: left;
 }
 th {
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.7px;
   text-transform: uppercase;
   font-weight: 400;
@@ -1032,7 +1032,7 @@ tr:last-child td {
 }
 td strong {
   font-weight: 500;
-  font-size: 11px;
+  font-size: 13px;
 }
 .align-right {
   text-align: right;
@@ -1059,20 +1059,21 @@ td strong {
 .role-text {
   text-transform: capitalize;
   color: #5e6b5a;
-  font-size: 11px;
+  font-size: 13px;
 }
 .inline-select {
   width: auto;
   min-width: 120px;
   margin: 0;
   min-height: 32px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 6px 25px 6px 8px;
 }
 .key-name {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 160px;
 }
 .key-name > svg {
   color: #889180;
@@ -1359,7 +1360,8 @@ td strong {
 .activity-connections tbody tr:last-child th {
   border-bottom: 0;
 }
-.activity-scroll-hint {
+.activity-scroll-hint,
+.table-scroll-hint {
   display: none;
 }
 .activity-summary-empty {
@@ -1437,7 +1439,7 @@ td strong {
 }
 .audit-tool {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   max-width: 230px;
 }
@@ -1450,7 +1452,7 @@ td strong {
 .duration-cell {
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 11px;
   color: #7b8475;
 }
 .duration-cell svg {
@@ -2344,6 +2346,15 @@ select {
   }
 }
 @media (max-width: 1190px) {
+  .table-scroll-hint {
+    display: block;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    background: #f8f9f3;
+    font-size: 12px;
+    line-height: 1.5;
+  }
   .context-panel {
     width: 226px;
     padding: 25px 18px;
@@ -2416,7 +2427,7 @@ select {
   }
   .audit-tool {
     max-width: 170px;
-    font-size: 9px;
+    font-size: 11px;
   }
 }
 @media (max-width: 1000px) {
@@ -3113,6 +3124,10 @@ body:has(.sidebar.is-open) {
   .modal select,
   .audit-filters select,
   .permission-label select {
+    font-size: 16px;
+  }
+  .inline-select {
+    min-height: 44px;
     font-size: 16px;
   }
   .composer-note > span,

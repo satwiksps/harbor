@@ -225,6 +225,11 @@ export function AuditPage({
         {records.error && (
           <ErrorBox message={records.error} retry={records.refresh} />
         )}
+        {!!records.data?.items.length && (
+          <p className="table-scroll-hint">
+            Scroll sideways for outcomes, timing and details.
+          </p>
+        )}
         {records.loading && !records.data ? (
           <div className="loading-panel">
             <Spinner label="Loading activity" />
