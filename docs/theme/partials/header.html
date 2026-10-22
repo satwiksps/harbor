@@ -6,10 +6,10 @@
 {% endif %}
 <header class="{{ class }}" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
-    <label class="md-header__button md-icon" for="__drawer">
+    <button type="button" class="md-header__button md-icon harbor-menu-button" data-harbor-toggle="__drawer" aria-label="Open navigation" aria-expanded="false">
       {% set icon = config.theme.icon.menu or "material/menu" %}
       {% include ".icons/" ~ icon ~ ".svg" %}
-    </label>
+    </button>
     <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo harbor-wordmark" aria-label="{{ config.site_name | e }}" data-md-component="logo">
       {{ config.site_name | e }}
     </a>
@@ -27,10 +27,10 @@
     {% if "material/search" in config.plugins %}
       {% set search = config.plugins["material/search"] | attr("config") %}
       {% if search.enabled %}
-        <label class="md-header__button md-icon" for="__search">
+        <button type="button" class="md-header__button md-icon harbor-search-button" data-harbor-toggle="__search" aria-label="Open search" aria-expanded="false">
           {% set icon = config.theme.icon.search or "material/magnify" %}
           {% include ".icons/" ~ icon ~ ".svg" %}
-        </label>
+        </button>
         {% include "partials/search.html" %}
       {% endif %}
     {% endif %}

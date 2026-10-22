@@ -12,11 +12,8 @@ ROOT = Path(__file__).absolute().parents[1]
 PUBLIC_DOCS = {
     "CONTRACT.md",
     "LICENSE",
-    "audit.md",
     "brand-notes.md",
-    "demo.md",
     "development.md",
-    "documentation.md",
     "external-clients.md",
     "getting-started.md",
     "index.md",
@@ -24,16 +21,15 @@ PUBLIC_DOCS = {
     "system-design.md",
     "threat-model.md",
     "user-guide.md",
-    "verification.md",
     "requirements.in",
     "requirements.txt",
     "robots.txt",
-    "assets/application-release-evidence.json",
-    "assets/external-agent-evidence.json",
     "assets/mark.svg",
     "stylesheets/extra.css",
+    "javascripts/extra.js",
     "theme/main.html",
     "theme/partials/header.html",
+    "theme/partials/nav.html",
 }
 BLOCKED_CONTENT = re.compile(
     r"urumi|\b(?:recruit(?:ment|ing|ers?)?|submissions?|internships?|assignments?)\b",
@@ -76,7 +72,18 @@ def validate_output(output: Path) -> int:
     for relative in ("index.html", "search/search_index.json", "robots.txt", "LICENSE"):
         if not (output / relative).is_file():
             raise ValueError(f"Missing documentation output: {relative}")
-    for relative in ("assets/console.png", "requirements.in", "requirements.txt", "theme"):
+    for relative in (
+        "assets/console.png",
+        "requirements.in",
+        "requirements.txt",
+        "theme",
+        "audit",
+        "demo",
+        "documentation",
+        "verification",
+        "assets/application-release-evidence.json",
+        "assets/external-agent-evidence.json",
+    ):
         if (output / relative).exists():
             raise ValueError(f"Private or build-only source in documentation output: {relative}")
     pages = list(output.rglob("*.html"))

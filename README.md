@@ -12,7 +12,7 @@
   <a href="https://docs.harbor.satwiksps.site/">Documentation</a> &nbsp;·&nbsp;
   <a href="https://docs.harbor.satwiksps.site/getting-started/">Installation</a> &nbsp;·&nbsp;
   <a href="https://docs.harbor.satwiksps.site/system-design/">Architecture</a> &nbsp;·&nbsp;
-  <a href="https://docs.harbor.satwiksps.site/verification/">Verification</a>
+  <a href="https://docs.harbor.satwiksps.site/threat-model/">Security</a>
 </p>
 
 A team MCP gateway for WooCommerce, with a React dashboard, personal API keys, role-based tool access, and Gemini chat with explicit write confirmation.
@@ -25,4 +25,4 @@ React and TypeScript · Python 3.12 and FastAPI · Official MCP SDK · PostgreSQ
 
 Follow the [installation guide](https://docs.harbor.satwiksps.site/getting-started/) for prerequisites, credentials, and bootstrap. The complete local deployment runs on Docker Desktop; no paid VPS is required. Gemini chat needs a provider key and available quota.
 
-The application repository is private; source access is required to run it. Scope, operational limits, security decisions, API reference, and test evidence are maintained in the documentation.
+The application repository is private; source access is required to run it. Usage, architecture, configuration, security and operations are covered in the documentation.

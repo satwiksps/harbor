@@ -1,0 +1,15 @@
+{% import "partials/nav-item.html" as item with context %}
+<nav class="md-nav md-nav--primary" aria-label="{{ lang.t('nav') }}" data-md-level="0">
+  <div class="md-nav__title harbor-drawer-heading">
+    <a class="harbor-drawer-home" href="{{ nav.homepage.url | url }}">{{ config.site_name | e }}</a>
+    <button type="button" class="md-icon harbor-drawer-close" aria-label="Close navigation">
+      {% include ".icons/material/close.svg" %}
+    </button>
+  </div>
+  <ul class="md-nav__list" data-md-scrollfix>
+    {% for nav_item in nav.items %}
+      {% set path = "__nav_" ~ loop.index %}
+      {{ item.render(nav_item, path, 1) }}
+    {% endfor %}
+  </ul>
+</nav>

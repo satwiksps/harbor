@@ -1,22 +1,22 @@
-# Development
+# Development and testing
 
-Use Python 3.12 with uv for the backend and Node.js 24 for frontend development. Run commands from the repository root unless a different directory is shown. The [getting started guide](getting-started.md) covers the full local Kubernetes deployment.
+Use Python 3.12 with uv for the backend and Node.js 24 for the dashboard. Run commands from the repository root unless a different directory is shown. The [installation guide](getting-started.md) covers the full local Kubernetes deployment.
 
 ## Source map
 
 | Directory | Responsibility |
 | --- | --- |
 | `backend/` | Gateway, sessions, permissions, registry, chat and migrations |
-| `upstreams/` | WooCommerce adapter, policy server and shipping server |
-| `dashboard/` | React and TypeScript dashboard |
-| `docker/wordpress/` | Store image, original product artwork and repeatable seed |
+| `upstreams/` | WooCommerce adapter, policy service and shipping service |
+| `dashboard/` | React and TypeScript console |
+| `docker/wordpress/` | Store image, theme, product artwork and initialization |
 | `deploy/` | Helm resources and local/production values |
 | `scripts/` | Cluster, release, backup and verification commands |
 | `tests/` | Unit, protocol, browser and deployed acceptance checks |
 | `examples/` | Independent MCP reference agent |
-| `docs/` and `mkdocs.yml` | Public documentation content and navigation |
+| `docs/` | Documentation pages, assets and dependency lockfiles |
 
-Read the [system design](system-design.md) before changing cross-service behavior. The [API and environment reference](CONTRACT.md) describes the frontend/backend contract. Generated `.venv`, `.tools`, `.runtime`, build outputs and private `.secrets` are local support directories, not application source.
+Read the [architecture](system-design.md) before changing cross-service behavior. The [API reference](CONTRACT.md) describes request schemas and configuration. Generated `.venv`, `.tools`, `.runtime`, build outputs and private `.secrets` are local support directories, not application source.
 
 ## Install and check
 
@@ -32,9 +32,9 @@ Set-Location ..
 .tools/helm.exe lint deploy/chart -f deploy/values-prod.yaml
 ```
 
-Helm is installed under `.tools` by bootstrap or `scripts/install-tools.ps1`. The frontend build type-checks before bundling. Its font preparation step downloads Switzer on a fresh installation; [visual provenance](brand-notes.md) documents the font source and licensing.
+Bootstrap or `scripts/install-tools.ps1` installs Helm under `.tools`. The frontend build type-checks before bundling. Its font preparation step downloads Switzer on a fresh installation; [asset attribution](brand-notes.md) describes its source and license.
 
-The PostgreSQL concurrency and activity-aggregation cases need `TEST_POSTGRES_URL` pointing to a disposable PostgreSQL database. They are skipped when that variable is absent. CI supplies a dedicated PostgreSQL service. Do not point test fixtures at the deployed application's database. Linux-specific schema memory checks run on Linux; Windows checks still exercise input and deadline guards.
+PostgreSQL concurrency and activity-aggregation tests need `TEST_POSTGRES_URL` pointing to a disposable PostgreSQL database. They are skipped when it is absent. CI supplies its own database. Never point these fixtures at application data. Linux-specific schema memory checks run on Linux; Windows still exercises input and deadline guards.
 
 ## Work on the dashboard
 
@@ -45,36 +45,23 @@ Set-Location dashboard
 npm run dev
 ```
 
-Vite proxies API requests to the local console ingress. Use the complete deployment for final verification and demonstrations.
+Vite proxies API requests to `http://harbor.localhost:8080`. Set `VITE_PROXY_TARGET` before starting Vite to use a different backend. The development server reloads frontend changes; the Kubernetes dashboard still serves its previously built image.
 
-After source changes, rebuild the images and roll out the chart:
+To update the local deployment, return to the repository root and run:
 
 ```powershell
 pwsh -File scripts/build-images.ps1
 pwsh -File scripts/deploy.ps1
 ```
 
-These commands change the running local release. Follow the [operations guide](operations.md) for backups, upgrades, migrations and rollback. A Helm rollback does not rewind database contents.
+Use the complete deployment to verify changes across services. See [operations](operations.md) before changing stored data, database versions or release configuration.
 
-## Run deployed checks deliberately
+## Browser checks without live mutations
 
-The integration harnesses require the running cluster and private credentials in `.secrets`. They are not read-only checks. Acceptance tests create users and keys, alter registry state and exercise real services; the checkout harness creates a product and order. Run them while other clients are idle, with synthetic store data.
+These console harnesses intercept API responses in the browser. They can target a frontend preview or a deployed dashboard, and do not send application mutations or provider requests:
 
 ```powershell
-uv run python -m tests.acceptance
 uv run playwright install chromium
-uv run python -m tests.browser_ui
-uv run python -m tests.browser_invitation
-uv run python -m tests.browser_visual
-```
-
-The acceptance harness calls all three upstreams over MCP and checks hidden writes, disabled servers, SSRF, revocation and audit isolation. UI regression tests combine real sign-in with browser response fixtures for reproducible failure and race conditions, without calling Gemini. Visual checks inspect the deployed pages at widths from 320 to 1440 px. Runtime evidence stays private under `.runtime`; harness-created API keys are revoked during cleanup.
-
-The invitation check accepts real invitations and changes the browser session. Use a separate browser profile for an interactive administrator session while it runs.
-
-For console checks with browser-local API fixtures:
-
-```powershell
 $env:HARBOR_URL = 'http://harbor.localhost:8080'
 uv run python -m tests.browser_accessibility
 uv run python -m tests.browser_observability
@@ -82,54 +69,109 @@ uv run python -m tests.browser_console
 Remove-Item Env:HARBOR_URL
 ```
 
-These harnesses can also target a running frontend preview. They do not send application mutations or provider requests. The Activity checks cover metrics, filtering, personal scope and failure recovery. Console regressions cover formatted replies, unsafe Markdown, reading position, approval focus, tool search with unsaved edits, narrow management layouts and member controls.
+They cover keyboard access, responsive layouts, Activity metrics and filters, error recovery, formatted replies, unsafe Markdown, reading position, approval focus, unsaved permission edits and member controls. Browser fixtures cannot establish that a deployed backend or provider works.
 
-For the storefront, use the published starter bottle and notebook products:
+## Checks against a running application
+
+Use a test installation with synthetic data and no other active clients. These harnesses use private credentials in `.secrets`; acceptance checks create users and keys, change registry state and call real services.
+
+```powershell
+uv run python -m tests.acceptance
+uv run python -m tests.browser_ui
+uv run python -m tests.browser_invitation
+uv run python -m tests.browser_visual
+```
+
+Acceptance covers all three MCP upstreams, hidden write tools, disabled connections, SSRF protection, revoked keys and audit isolation. UI regressions combine real sign-in with browser fixtures for failure and race conditions. The invitation check accepts real invitations and changes its browser session. Visual checks inspect widths from 320 to 1440 px. Reports and screenshots stay under `.runtime`; temporary API keys are revoked during cleanup.
+
+### Storefront
+
+The storefront harness needs the starter bottle and notebook products to be published:
 
 ```powershell
 uv run python -m tests.browser_store
 ```
 
-This check uses isolated shopping sessions at desktop and mobile widths. It covers keyboard add-to-cart, cart counts, quantities, remove and undo, empty carts, checkout validation and shipping totals. It needs neither an administrator login nor Gemini. By default it places no orders and empties its carts before closing. Add `--checkout` only on a demonstration deployment to place one synthetic cash-on-delivery order and verify the receipt. An uncertain checkout is recorded and never automatically resubmitted; inspect the store before rerunning that option. Reports and screenshots are saved in a separate private directory for each run.
+It checks keyboard add-to-cart, cart counts, quantity changes, remove and undo, empty carts, checkout validation and shipping totals in isolated shopping sessions. It needs no administrator login or Gemini key. By default it places no orders and empties its carts before closing.
 
-The following checks use a live Gemini API key and consume quota. The browser acceptance flow also submits a real test checkout:
+Add `--checkout` only on a test deployment to place a synthetic cash-on-delivery order and check the receipt. An uncertain checkout is recorded and never automatically resubmitted; inspect the store before rerunning it. The resulting order remains in the store.
+
+### Live chat and checkout
+
+These checks use the configured Gemini key and consume provider quota. The browser acceptance flow also submits a test checkout:
 
 ```powershell
 uv run python -m tests.acceptance --chat
 uv run python -m tests.browser_acceptance
 ```
 
-`tests.browser_acceptance --audit-only` writes a separate activity-only report. It does not establish that the complete checkout and chat journey passed.
+`tests.browser_acceptance --audit-only` checks only Activity. It does not verify checkout or chat.
 
 ### Testing a public deployment
 
-Use the public console and store URLs together. Copy that server's private `development.json` into a protected, Git-excluded local directory; the example uses `.secrets/oci/production`. This file contains the live credentials, so do not substitute the local development file or publish it with the reports.
+Set both application URLs and use that deployment's credentials. Copy its `development.json` into a protected, Git-excluded directory. Do not substitute local credentials or include the file in reports.
 
 ```powershell
-$env:HARBOR_URL = 'https://harbor.satwiksps.site'
-$env:HARBOR_STORE_URL = 'https://store.harbor.satwiksps.site'
-$env:HARBOR_TEST_CREDENTIALS = (Resolve-Path '.secrets/oci/production/development.json').Path
-$env:HARBOR_TEST_OUTPUT_DIR = Join-Path (Get-Location) ('.runtime/public-' + (Get-Date -Format yyyyMMdd-HHmmss))
+$env:HARBOR_URL = 'https://console.example.com'
+$env:HARBOR_STORE_URL = 'https://store.example.com'
+$env:HARBOR_TEST_CREDENTIALS = (Resolve-Path '.secrets/staging/development.json').Path
+$env:HARBOR_TEST_OUTPUT_DIR = Join-Path (Get-Location) ('.runtime/staging-' + (Get-Date -Format yyyyMMdd-HHmmss))
 uv run python -m tests.acceptance
 uv run python -m tests.browser_invitation
 uv run python -m tests.browser_visual
-uv run python -m tests.external_agent --inspector-only
 ```
 
-Run the Gemini/checkout commands above afterward when a synthetic product and order are appropriate. The harnesses create test members, revoke temporary keys and keep reports separate from local checks. Checkout records remain in the demonstration store. Run suites sequentially and retain failed reports alongside successful reruns.
+Replace the example hosts with the intended test deployment. Run suites sequentially, use synthetic data and inspect cleanup results. Failed reports are useful for diagnosis; retain them alongside successful reruns.
 
-These settings apply to the deployed Python harnesses, not every operational script. Local recovery and failure scripts still target the local cluster; review their context before using any operation against a VPS. Clear the four environment variables when returning to local testing.
+These variables apply to deployed Python harnesses. Operational recovery and failure scripts have their own cluster selection; review it before using them. Clear the four variables when returning to local testing:
+
+```powershell
+Remove-Item Env:HARBOR_URL, Env:HARBOR_STORE_URL, Env:HARBOR_TEST_CREDENTIALS, Env:HARBOR_TEST_OUTPUT_DIR
+```
 
 ## External client verification
 
-The [external client guide](external-clients.md) describes MCP Inspector and an independent SDK agent with no backend imports. The [sanitized evidence](assets/external-agent-evidence.json) records a successful run across all three upstreams for order 25. Gemini CLI is not a claimed passing client.
+For ordinary client configuration, use [external MCP clients](external-clients.md). To test the integration harness, first install its pinned Inspector in the ignored tools directory:
 
-The [verification record](verification.md) lists executed checks, their environment and limitations. The [audit record](audit.md) maps corrections to reported findings. Historical passing results are evidence for those runs, not a substitute for checking a new change.
+```powershell
+npm.cmd install --prefix .tools/external-client --no-audit --no-fund @modelcontextprotocol/inspector@2.11.0
+uv run python -m tests.external_agent --prepare-only
+uv run python -m tests.acceptance
+uv run python -m tests.external_agent --inspector-only
+```
 
-## CI and scope
+`--prepare-only` checks the installed Inspector without API calls. Acceptance creates a test member and saves its credentials in `.secrets/demo-member.json`, or alongside the selected deployment credentials. `--inspector-only` checks tool discovery and an order read without calling a model. Run these against an idle test installation.
 
-The application CI job runs locked dependency installation, Python checks, disposable PostgreSQL cases, recovery and credential-preparation guards, the dashboard build, and Activity, accessibility and console interaction fixtures against that build. Separate jobs lint/render the Helm chart and build all three images. The image job also probes the authentication memory budget in a constrained container.
+For the natural-language workflow, save a Gemini key in `.secrets/gemini-api-key.txt` for local testing. If `HARBOR_TEST_CREDENTIALS` selects another deployment's credential file, save `gemini-api-key.txt` beside that file instead, such as `.secrets/staging/gemini-api-key.txt`. Then run:
 
-The system deliberately uses one store, one gateway replica and process-local rate limits. The [public deployment](operations.md#vps-configuration) uses TLS, secure cookies, cluster Secret encryption and protected backups. Production values remain a template that must be adapted for each target. Schema migrations are forward-only until an explicit rollback migration exists.
+```powershell
+uv run python -m tests.external_agent
+```
 
-Keep credentials, raw runtime evidence, recordings and private project material outside commits. Before sharing a demo, use the [walkthrough checklist](demo.md) to review it for passwords, keys and invitation tokens.
+This launches `examples/ask_gateway.py`, requires successful calls to at least two upstreams under the member's identity, and revokes the temporary key afterward. Add `--order-id ID` to include a specific existing order in the shipping check. The report is saved privately under `.runtime`; an answer that merely claims to have called tools does not pass.
+
+## Documentation
+
+MkDocs builds a static site from `docs/`. Install its locked dependencies in a separate environment, then preview on loopback:
+
+```powershell
+uv venv .runtime/docs-venv --python 3.12
+uv pip sync docs/requirements.txt --require-hashes --python .runtime/docs-venv/Scripts/python.exe
+.runtime/docs-venv/Scripts/python.exe -m mkdocs serve --dev-addr 127.0.0.1:8765
+```
+
+Open `http://127.0.0.1:8765`. On Linux or macOS, use `.runtime/docs-venv/bin/python`. For publication, run the strict build:
+
+```powershell
+.runtime/docs-venv/Scripts/python.exe scripts/build-docs.py
+```
+
+The helper validates approved inputs, relative links, heading anchors and publication exclusions. New pages need entries in `mkdocs.yml` and `PUBLIC_DOCS` in `scripts/build-docs.py`. Use relative `.md` links and check changed pages on both desktop and narrow screens. Files under `docs/` can become public even when absent from navigation, so review assets as carefully as prose.
+
+Publish only `.runtime/docs-site`, never the repository root, `.runtime` or the raw source directory. The documentation build needs no application credentials or running cluster. `DOCS_SITE_URL` sets canonical links and should match the public documentation address. The site's indexing directives do not provide access control.
+
+## Continuous integration
+
+CI checks locked dependencies, Python tests, disposable PostgreSQL cases, credential and recovery guards, the dashboard build, and the fixture-based browser suites. Separate jobs validate the documentation, lint/render Helm and build all three application images. Container checks cover authentication memory limits and preservation of store data during theme migration.
+
+CI does not provision a cluster or exercise a live Gemini request. Run the relevant deployed checks for changes to networking, credentials, migrations or cross-service behavior. Keep credentials, customer data and raw runtime reports outside commits.

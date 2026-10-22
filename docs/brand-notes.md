@@ -1,27 +1,20 @@
-# Visual design and asset provenance
+# Assets and licenses
 
-Harbor uses a quiet sidebar, generous whitespace, compact operational tables, restrained color, and a chat workspace with live connection context. The application mark and layout are original to this project.
+The documentation and original assets under `docs/` use the [MIT license](LICENSE). This license does not apply to the application source. Third-party packages and assets retain their own licenses.
 
-## Design tokens
+## Fonts and icons
 
-| Token | Value | Use |
+| Asset | Used in | Source and license |
 | --- | --- | --- |
-| Canvas | `#F3F2ED` | Warm background |
-| Foreground | `#121517` | Main text |
-| Accent | `#136B69` | Primary actions and selected controls |
-| Border | `#D6D3C8` | Panels and dividers |
+| Switzer | Console interface | [Fontshare](https://www.fontshare.com/fonts/switzer), ITF Free Font License |
+| JetBrains Mono | Console technical text | `@fontsource/jetbrains-mono`, SIL Open Font License |
+| Lucide | Console icons | `lucide-react`, ISC license |
+| System fonts | Documentation | Fonts already available on the reader's device |
 
-The dashboard uses Switzer for interface text and JetBrains Mono for technical details. The documentation website uses system fonts and the project's SVG mark, with the same restrained palette.
+The console's `npm run fonts` command downloads Switzer directly from its publisher. Development and production builds run this step automatically. The font binary is excluded from Git; the publisher's license is retained in `dashboard/public/fonts/Switzer-LICENSE.txt`. A fresh build needs access to `api.fontshare.com` and `cdn.fontshare.com`. The running console serves its fonts locally.
 
-## Fonts
+JetBrains Mono and Lucide are installed through npm. Their license files are included in their packages.
 
-- Switzer is from [Fontshare](https://www.fontshare.com/fonts/switzer). The publisher's ITF Free Font License allows self-hosting for the application's own use but restricts redistribution of font software in public repositories. The binary is therefore ignored by Git. `npm run fonts` downloads it directly from Fontshare for each installation, and `predev` / `prebuild` run that step automatically. The unmodified publisher license is at `dashboard/public/fonts/Switzer-LICENSE.txt`. A standard system sans-serif fallback is always configured. Font downloads require access to `api.fontshare.com` and `cdn.fontshare.com` during a fresh build, never at application runtime.
-- JetBrains Mono is installed from `@fontsource/jetbrains-mono` and bundled locally. It uses the SIL Open Font License, included in the npm package and copied into the dashboard's public font directory.
-- The application mark is an original inline SVG. Interface icons are from Lucide, under its ISC license. No third-party logo is reused.
-- The three seeded storefront product illustrations are original SVG artwork in `docker/wordpress/assets/`: a canvas tote, a steel bottle, and a notebook. They use no stock photography, external image service, or third-party product branding.
+## Original artwork
 
-## UI behavior
-
-All counts, connection states, members, keys, and activity come from the API. Empty states remain empty until a real action succeeds. Connection status refreshes every 30 seconds while the page is visible. API secrets are held only in memory and shown once after creation. Native modal dialogs trap keyboard focus; labels, visible focus, reduced-motion preferences, responsive layouts, and text descriptions accompany controls and statuses.
-
-Conversation text is rendered as plain text, with no raw HTML execution. Tool arguments and results are expandable, and proposed write actions require explicit review and confirmation. Role rules remain enforced by the backend; UI controls provide guidance, not authorization.
+The Harbor mark and the storefront's tote, bottle and notebook illustrations are original SVG assets. The product illustrations live in `docker/wordpress/assets/` and do not depend on an external image service.

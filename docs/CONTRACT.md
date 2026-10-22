@@ -1,4 +1,4 @@
-# API and environment reference
+# API and configuration
 
 The browser uses REST routes under `/api` and sends cookies with `credentials: include`. External MCP clients use Streamable HTTP at `/mcp`, authenticated with a personal bearer key. A gateway key does not authenticate the browser management API. Application JSON keys use `snake_case`; MCP tool schemas retain the protocol's `inputSchema` field.
 
@@ -88,9 +88,9 @@ Tool permissions are `read` or `write`. New tools default to administrator-only.
 | `GET /api/invites` | Lists `{id, email, role, expires_at, accepted_at}` | Administrator |
 | `POST /api/invites` | `{email, role}` returns invitation details and `invite_url` | Administrator |
 
-Key records contain `id`, `name`, `prefix`, `user_id`, `created_at`, `last_used_at` and `revoked_at`. Only creation returns the full key. Newly issued keys use the `harbor_` prefix; existing `cc_` keys remain valid until revoked. The final active administrator cannot be demoted or deactivated. Invitation links must be copied and shared privately; there is no email provider.
+Key records contain `id`, `name`, `prefix`, `user_id`, `created_at`, `last_used_at` and `revoked_at`. Only creation returns the full key. Issued keys use the `harbor_` prefix. The final active administrator cannot be demoted or deactivated. Invitation links must be copied and shared privately; there is no email provider.
 
-## Activity and chat
+## Activity
 
 `GET /api/audit` returns `{items, total}` and accepts these query parameters:
 
@@ -126,6 +126,8 @@ Latency covers the gateway call, including queueing, connection setup and tool e
 
 Groups retain their stable upstream IDs through renames and deletion. A current registration supplies its name; a removed registration uses its latest matching audit name and sets `server_deleted`. A null ID forms an `Unattributed` group. A query with no matching calls returns zero calls with null rate and latency. Missing authentication returns `401`, invalid parameters return `422`, and a database failure returns sanitized `503` detail with `Retry-After: 1`.
 
+## Chat
+
 `POST /api/chat` accepts:
 
 ```json
@@ -143,6 +145,20 @@ The response contains `message` and `tool_calls`. Tool calls include `name`, `ar
 Send `POST /api/chat/confirm` with `{id, approve}` to approve or cancel a proposal. The server binds it to the session and user, enforces its five-minute expiry and one-use limit, and rechecks the reviewed target and current authority. Actual tool calls use the MCP HTTP gateway with a session-derived credential. These confirmations govern dashboard chat; an external administrator client can call permitted write tools directly.
 
 Responses are not streamed. Missing Gemini configuration produces a `503` error. Chat history is supplied by the browser on each request, not stored as a server-side conversation.
+
+## Request limits
+
+The gateway applies rolling 60-second limits in its process:
+
+| Request | Limit and identity |
+| --- | --- |
+| Login | 10 per source IP |
+| Invitation lookup | 30 per source IP |
+| Invitation acceptance | 10 per source IP |
+| `POST /api/chat` | 12 per user |
+| Authenticated MCP requests | 120 per user, shared across that user's keys |
+
+Exceeding a limit returns `429`. These limits are separate from Gemini's provider quota, which depends on the configured account. They are not distributed across replicas. See [security](threat-model.md#resource-limits-and-failures) for capacity and client-IP boundaries.
 
 ## Service interfaces
 

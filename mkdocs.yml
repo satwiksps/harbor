@@ -24,23 +24,18 @@ theme:
 
 nav:
   - Overview: index.md
-  - Start here:
+  - Get started:
       - Installation: getting-started.md
-      - Using the console: user-guide.md
+      - Console guide: user-guide.md
       - External MCP clients: external-clients.md
-  - Engineering:
+  - Reference:
       - Architecture: system-design.md
       - API and configuration: CONTRACT.md
       - Security: threat-model.md
+  - Maintain:
       - Development and testing: development.md
-  - Operations:
       - Deployment and recovery: operations.md
-  - Project records:
-      - Verification: verification.md
-      - Audit and corrections: audit.md
-      - Demo walkthrough: demo.md
-      - Design and assets: brand-notes.md
-      - Maintaining the docs: documentation.md
+  - Assets and licenses: brand-notes.md
 
 plugins:
   - search
@@ -75,5 +70,8 @@ exclude_docs: |
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
 
 copyright: Harbor documentation.

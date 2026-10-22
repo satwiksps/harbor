@@ -1,51 +1,48 @@
 # Harbor
 
-Harbor lets a team use one WooCommerce store through a shared tool gateway. An administrator connects the services and reviews access. Members then use dashboard chat or an external client with their own identity and permissions.
+Harbor gives a team one place to access its WooCommerce tools. Connect services once, choose which tools members can use, then work through the web console or an external MCP client. Each tool call runs under the caller's identity and appears in Activity.
 
-**Model Context Protocol (MCP)** is the interface clients use to discover tools and call them with structured arguments. Harbor is the **gateway** that checks who is calling before forwarding a request. A connected **upstream** is a service behind that gateway, such as the WooCommerce adapter. You do not need to configure each upstream in every client.
+Use the [console](https://harbor.satwiksps.site/) with an invited account, browse the [sample store](https://store.harbor.satwiksps.site/), or [install Harbor locally](getting-started.md) with access to the source repository.
 
-For example, a member can read today's orders and ask for a shipping estimate. An administrator can also create a product, with an approval step in dashboard chat. Both users' tool calls appear in Activity.
+## How it works
 
-Open the [live console](https://harbor.satwiksps.site/) with an invited team account, or browse the [demo storefront](https://store.harbor.satwiksps.site/). Both run on the same single-node deployment described in [operations](operations.md#vps-configuration).
+**Model Context Protocol (MCP)** lets a client discover tools and call them with structured arguments. Harbor is an MCP **gateway**: it checks the caller's permissions and forwards each call to the connected service that provides the tool. These connected services are called **upstreams**.
 
-## Start here
+For example, a member can ask for today's orders and a shipping estimate. An administrator can also create a product, after reviewing and approving the change in console chat. Both use the same gateway; members only receive tools they are allowed to use.
 
-| I want to... | Read |
+The bundled services are:
+
+| Service | Tools and data |
 | --- | --- |
-| Run the complete system locally | [Getting started](getting-started.md) |
-| Use chat, invite a member or manage tool access | [User guide](user-guide.md) |
-| Connect an external MCP client | [External clients](external-clients.md) |
-| Change the code and run checks | [Development](development.md) |
-| Understand the architecture and its tradeoffs | [System design](system-design.md) |
-| Operate, back up or deploy the system | [Operations](operations.md) |
-| Review the security boundary and remaining risks | [Threat model](threat-model.md) |
-| Inspect what was tested and corrected | [Verification](verification.md) and [audit record](audit.md) |
+| WooCommerce | Read products and orders; create products and update order status |
+| Store policies | Read and search the sample store's shipping, returns and fulfillment policies |
+| Shipping | Estimate delivery charges from the sample store's rate table |
 
-## What runs
+The **Harbor Supply** storefront lets customers browse products, manage a cart and place a sample cash-on-delivery order. Its products and orders are the same records exposed through the WooCommerce tools.
 
-| Component | Responsibility |
+## Choose a starting point
+
+| Your task | Guide |
 | --- | --- |
-| Harbor dashboard and gateway | Chat, team access, API keys, connections and activity |
-| WooCommerce MCP server | Read products and orders; create products and update order status |
-| Store policies MCP server | Read and search versioned sample policies |
-| Shipping MCP server | Estimate delivery charges using the store's sample rate table |
-| Harbor Supply storefront | Browse products and complete a cash-on-delivery checkout |
+| Run Harbor on your computer | [Installation](getting-started.md) |
+| Use chat, invite a member or manage access | [Using the console](user-guide.md) |
+| Connect your own MCP client | [External MCP clients](external-clients.md) |
+| Understand the components and request flow | [Architecture](system-design.md) |
+| Find API routes and environment settings | [API and configuration](CONTRACT.md) |
+| Change the code and run tests | [Development and testing](development.md) |
+| Deploy, back up or recover Harbor | [Deployment and recovery](operations.md) |
+| Understand permissions and security boundaries | [Security](threat-model.md) |
 
-The React and TypeScript dashboard, Python gateway, three MCP servers and storefront run together in Kubernetes. PostgreSQL stores Harbor's records; MariaDB and a separate content volume store WordPress data.
+## Technology
 
-## Capabilities
+The console uses React and TypeScript. A Python and FastAPI gateway connects to MCP servers through the official MCP SDK. PostgreSQL stores users, connections and activity; WooCommerce uses MariaDB and a separate WordPress content volume. A Helm chart deploys the system to Kubernetes, using k3d locally or k3s on a server.
 
-- A dynamic server registry with collision-safe tool names, cached discovery, isolated timeouts and credentials stored in Kubernetes Secrets.
-- Invitations, administrator and member roles, individually hashed API keys, immediate revocation and per-tool role permissions.
-- Gemini chat with bounded discovery for large catalogs, calls under the signed-in user's identity and confirmation before a write.
-- Activity history and per-connection counts, failure rates, median and p95 latency, scoped to the viewer's access.
-- SSRF protection, network isolation and least-privilege Kubernetes RBAC.
-- One Helm chart with local and production values, repeatable bootstrap, backup scripts and CI checks.
+Gemini powers optional console chat. The gateway, API keys, connection management and external MCP access work without a model provider key. Chat requires a configured key and available provider quota.
 
-## Scope and evidence
+## Scope
 
-Local execution uses your computer and has no VPS dependency. Chat requires a Gemini API key and is subject to the provider's quota. A missing key leaves management and MCP available, with an explicit unavailable-chat notice.
+Harbor supports one team, one WooCommerce store and one gateway replica. Tool access is role-based: administrators review and manage tools, while members use tools granted read access. Personal API keys identify each external client user. Browser OAuth for MCP clients and multi-replica operation are not implemented.
 
-The system supports one team, one store and one gateway replica. The storefront is a demonstration: it does not collect payments, send email or book carriers. The public Oracle VPS uses time-limited trial credits and trusted HTTPS. Its single node and local storage do not provide high availability. The [verification record](verification.md) distinguishes completed checks from remaining work, and the [threat model](threat-model.md) explains the security boundaries.
+The sample storefront does not process payments, send email or book shipments. Its shipping quotes use a local rate table. Use fictional customer details when placing sample orders. A single-node deployment with local storage does not provide high availability.
 
-This website hosts documentation only. The application repository is private, so repository access is needed to inspect or run the source. Start with [installation](getting-started.md), or use the [technical walkthrough](demo.md) to review an already running system.
+These docs describe the application and its operation. The source repository is private, so source access is required to install or modify Harbor.

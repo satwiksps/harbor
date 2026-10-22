@@ -1,6 +1,6 @@
 # Operations and deployment
 
-The local target is one k3d server backed by Docker Desktop. It runs the same Helm chart as the public k3s VPS. A single node and local-path storage are deliberate demo constraints: they provide persistence across pod restarts, not node failure recovery or high availability.
+Harbor runs on one Kubernetes node, with one replica of each service. Local development uses k3d and Docker Desktop; a Linux VPS uses K3s and the same Helm chart. Persistent volumes survive pod replacement, but local-path storage does not protect against node loss. Keep verified backups off the node.
 
 Use [Getting started](getting-started.md) for a first installation. This guide covers maintenance, production configuration and recovery. Commands assume the fresh-install namespace and release `harbor`; retained installations must use their recorded names.
 
@@ -18,8 +18,6 @@ Helm 4.3.1 and k3d 5.9.0 are installed only in `.tools`, with SHA256 checks agai
 ### Preserve an existing installation
 
 For an existing installation with different resource names, record its actual `clusterName`, `namespace`, `releaseName`, `postgresUser` and `postgresDatabase` in the ignored `.runtime/local-settings.json` before running setup or maintenance. The scripts read these overrides; they do not discover an earlier installation automatically. Keep the existing cluster, namespace, Helm release, database identity and persistent volumes so the upgrade uses the same data.
-
-Before the first Harbor upgrade, copy the current application Secret and mutable registry Secret to `harbor-app-secrets` and `harbor-upstream-credentials` in the retained namespace, preserving their contents and access restrictions. Do not regenerate passwords or replace registry credentials with seed values. Review the settings and Secret migration before invoking bootstrap.
 
 The examples below use fresh-install defaults. Substitute the recorded namespace, release and PostgreSQL names in manual commands when operating a retained installation. `backup.ps1` includes `local-settings.json` when it exists; restore it to `.runtime` before invoking maintenance on recovered data.
 
@@ -60,12 +58,6 @@ Local names use the `.localhost` domain, so an administrator hosts-file edit is 
 
 Only Traefik ingress and the Kubernetes administration API are published, both on loopback. The WordPress Service listens on port 80 and forwards to non-root Apache on 8080. Gateway, dashboard, upstreams, and databases are all ClusterIP Services. The upstream port is 8001 and has no Ingress route.
 
-### Repair older port bindings
-
-Older clusters created before the loopback fix retain their original Docker bindings. Startup refuses to resume such a cluster automatically. During an idle maintenance window, take a backup with `./scripts/backup.ps1`, preview `./scripts/limit-local-bindings.ps1`, then run it with `-Apply`. This uses k3d's port-edit operation to replace only the project's load balancer twice: first remove its wildcard publications, then add loopback publications at the same ports. The k3s server and its data volumes stay in place. The helper checks that the server ID, start time and mounts did not change, and changes only the project's kubeconfig API address to `127.0.0.1`. If interrupted between those steps, rerun the same command; `.runtime/local-binding-migration.json` retains the non-sensitive API port and server identity needed to finish. Do not delete the cluster to change bindings.
-
-Inspect the final result with `docker inspect $projectLoadBalancer --format '{{json .HostConfig.PortBindings}}'`, using the container selected above. All three entries must use `127.0.0.1`. Confirm that the dashboard and API work on loopback and that connecting to the host's non-loopback address fails. Do not dump all container labels or environment variables, which can contain cluster credentials.
-
 ### Rebuild, stop and remove workloads
 
 ```powershell
@@ -87,7 +79,7 @@ The deployment script creates `.runtime/values-runtime.yaml` with the actual nod
 
 ### Store initialization and versions
 
-The WordPress bootstrap Job runs after installation and upgrades. It installs WordPress once, activates the packaged WooCommerce and Storefront versions, and creates missing API credentials. Starter products and classic cart/checkout content are initialized only before the `harbor_seed_complete` marker is set; later product deletions and page edits remain intact. Earlier seed markers remain compatible without replaying initialization. It configures INR, the Asia/Kolkata timezone, COD and the sample shipping table, and turns off WooCommerce coming-soon mode so anonymous visitors can browse. If no published privacy page exists, it publishes a short demo data-use notice once and links checkout to it; later edits remain intact. The demo intentionally has no outbound email provider. The original product SVGs are packaged assets; arbitrary SVG uploads are not enabled. Products without media have a labeled typographic card rather than a broken-image icon.
+The WordPress bootstrap Job runs after installation and upgrades. It installs WordPress once, activates the packaged WooCommerce and Storefront versions, and creates missing API credentials. Starter products and classic cart/checkout content are initialized only before the `harbor_seed_complete` marker is set; later product deletions and page edits remain intact. It configures INR, the Asia/Kolkata timezone, COD and the sample shipping table, and turns off WooCommerce coming-soon mode so anonymous visitors can browse. If no published privacy page exists, it publishes a short sample data-use notice once and links checkout to it; later edits remain intact. No outbound email provider is configured. The original product SVGs are packaged assets; arbitrary SVG uploads are not enabled. Products without media have a labeled typographic card rather than a broken-image icon.
 
 Initialization runs through WP-CLI. Apache blocks the browser installer and setup-configuration endpoints, including path suffixes, from the first start. Normal administrator sign-in remains available after bootstrap.
 
@@ -95,37 +87,15 @@ The tested store image pins WordPress 7.1.3, PHP 8.3, WooCommerce 11.2.1, Storef
 
 ## VPS configuration
 
-The [public console](https://harbor.satwiksps.site/) and [storefront](https://store.harbor.satwiksps.site/) run on one Oracle VM using the same Harbor chart as the local installation.
+Use a dedicated Linux VM with enough capacity for the workloads in `deploy/chart/values.yaml`, persistent storage, a public address and two DNS names. The deployment helper supports a single K3s node. Choose CPU architecture, disk sizes and resource limits for your environment; cloud account and billing setup are outside Harbor.
 
-| Setting | Deployed configuration |
-| --- | --- |
-| Compute | AMD `VM.Standard.E5.Flex`, 2 OCPUs, 12 GB RAM, 100 GB boot volume |
-| Operating system | Ubuntu 24.04, x86-64 |
-| Kubernetes and packaging | k3s `v1.35.5+k3s1`, Helm `4.3.1` |
-| HTTPS | Traefik, cert-manager `v1.21.2`, trusted Let's Encrypt certificate |
-| Persistence | Three bound PVCs for PostgreSQL, MariaDB and WordPress content |
-
-The 21 October 2026 deployment check found all eight application deployments ready and both HTTPS hostnames valid. HTTP redirects to HTTPS. Application, browser and recovery results are recorded separately in [verification](verification.md).
-
-### Oracle hosting choices
-
-The deployed E5 VM consumes trial credits and is not an Always Free resource. The account remains on Free Tier without a Pay As You Go upgrade. Trial resources are temporary: back up and migrate the deployment before the credits or trial period expire. Oracle states that the card is not charged unless the account is upgraded. See the [trial and expiry rules](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
-
-Always Free Ampere capacity was unavailable when this VM was created. A later move to Arm needs images built for `linux/arm64` and a database/content restore. Verify [Oracle's current free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) before creating replacement resources. Free capacity and continued availability are not guaranteed; keep an off-node backup.
+The commands below use Ubuntu, x86-64, K3s `v1.35.5+k3s1`, Helm `4.3.1` and cert-manager `v1.21.2`. Use images and installer archives matching your host architecture.
 
 ### Prepare the public host
 
-Use one VM and its existing public address, without an external cloud load balancer. In the cloud firewall allow TCP 80/443 from the internet and TCP 22 only from the operator's current public IP. Keep 6443, database ports and upstream ports closed to the internet. SSH provides the administration path. Inspect the Ubuntu host firewall too: retain Oracle's existing link-local and storage rules, then permit the web ports and k3s pod forwarding. Do not flush the firewall or use UFW to edit an Oracle Ubuntu image's rules. See [Oracle's essential firewall rules](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm#Essential_Firewall_Rules).
+Use one VM and its existing public address, without an external cloud load balancer. In the cloud firewall allow TCP 80/443 from the internet and TCP 22 only from the operator's current public IP. Keep 6443, database ports and upstream ports closed to the internet. SSH provides the administration path. Inspect the host firewall too. Preserve the cloud image's storage, metadata and management rules while permitting web traffic and K3s pod forwarding; do not replace the ruleset blindly.
 
-The deployment uses three subdomains of an existing domain. Console and store DNS records point to the VM's public IPv4 address; documentation is hosted separately on Cloudflare Pages:
-
-| DNS host relative to `satwiksps.site` | Type | Destination |
-| --- | --- | --- |
-| `harbor` | A | VM public IPv4 address |
-| `store.harbor` | A | VM public IPv4 address |
-| `docs.harbor` | CNAME | `useharbor.pages.dev` |
-
-The root and `www` records continue serving the portfolio. Keep these records unchanged when editing Harbor's subdomains. Verify both application names resolve to the VM before requesting their Let's Encrypt HTTP-01 certificate. Adding these subdomains requires no separate domain purchase; the existing domain still needs renewal. Cloudflare manages the documentation certificate separately, as described in [documentation hosting](documentation.md#hosting-and-publication).
+Create DNS records for separate console and store hosts, such as `console.example.com` and `store.example.com`, pointing to the VM. Confirm both names resolve before requesting a certificate. Documentation is a separate static site and does not need an ingress route in this cluster. Preserve any unrelated DNS records.
 
 A future VM move can retain the same application names by updating their A records after restoring and testing the destination. Changing the application hostname also requires updating ingress hosts, public URLs and WordPress's stored URLs before checking redirects, sign-in, invitations, checkout and external clients.
 
@@ -141,7 +111,7 @@ sudo k3s secrets-encrypt status
 sudo kubectl get nodes -o wide
 ```
 
-Do not set `node-external-ip` for an OCI node behind public-IP NAT when preserving client addresses with `externalTrafficPolicy: Local`. K3s documents that combination as incompatible. The provided Traefik configuration uses `Local` and leaves forwarding-header trust disabled. See [K3s ServiceLB behavior](https://docs.k3s.io/networking/networking-services#usage).
+Do not set `node-external-ip` for a node behind public-IP NAT when preserving client addresses with `externalTrafficPolicy: Local`. K3s documents that combination as incompatible. The provided Traefik configuration uses `Local` and leaves forwarding-header trust disabled. See [K3s ServiceLB behavior](https://docs.k3s.io/networking/networking-services#usage).
 
 Install the pinned Helm archive matching the VM architecture and verify its official checksum. For AMD:
 
@@ -191,7 +161,7 @@ On later releases, use the existing console and store hostnames. The helper pres
 
 1. Install a supported k3s version with Traefik, local-path storage, the network-policy controller, and `--secrets-encryption`. The locally tested version is `v1.35.5+k3s1`. Follow the [official k3s installation guide](https://docs.k3s.io/quick-start); inspect and pin installer inputs for your environment. Keep Secret encryption keys and the cluster token in a protected backup.
 2. Point two DNS names to the server. Provision a certificate and a TLS Secret or install cert-manager separately. TLS is required for real credentials on a public deployment. Configure Traefik to redirect HTTP to HTTPS. If using cert-manager's HTTP-01 challenge, explicitly allow Traefik to reach its solver pods through the namespace's default-deny NetworkPolicy, including during renewal. Merely setting `ingress.tls` does not issue a certificate or create a redirect.
-3. Build the three Dockerfiles, tag them with a release version, and replace every `REPLACE_OWNER` image in `deploy/values-prod.yaml`. Application images contain source code. Keep the registry private and configure an image-pull Secret with `imagePullSecrets: [{name: registry-credentials}]`, or import the images directly into containerd on a single-node host. Use images built for that host's CPU architecture.
+3. Build the three Dockerfiles, tag them with a release version, and replace every `REPLACE_OWNER` image in `deploy/values-prod.yaml`. Application images contain source code. For a private registry, configure an image-pull Secret with `imagePullSecrets: [{name: registry-credentials}]`. Alternatively, import the images directly into containerd on a single-node host. Use images built for that host's CPU architecture.
 4. Copy `deploy/values-prod.yaml` to a private values file. Set both hosts, both full public URLs, the TLS Secret, administrator identity, storage class and sizes. Set `networkPolicy.apiServerCidr` to the Kubernetes Service IP `/32` and `apiServerNodeCidr` to the control-plane internal IP `/32`. Default k3s uses `10.43.0.1/32` for the API Service, but verify rather than assuming. Set `gateway.trustedProxyCidrs` to only the pod CIDRs of the nodes running Traefik. The one-node default is `10.42.0.0/24`; verify it against the actual node. Keep `gateway.secureCookies: true` and `networkPolicy.enabled: true`.
 
 Example discovery commands:
@@ -239,7 +209,7 @@ Keep Traefik's `forwardedHeaders.insecure` disabled and leave `forwardedHeaders.
 
 ### Credential storage and rotation
 
-The gateway Role can get and patch only `harbor-upstream-credentials`. It cannot list Secrets, read `harbor-app-secrets`, or create deployments. Each bundled upstream reads its own service authentication token from `harbor-app-secrets`; the gateway keeps a separate mutable copy. Editing or deleting a registry credential therefore cannot remove a token required for an upstream pod to start. To rotate a bundled service token, update its protected application Secret value, restart that service, and update its gateway credential. Application credentials are referenced through Secrets instead of being embedded in Helm values or release manifests. Kubernetes Secrets are not encryption by themselves; the cluster must enable encryption at rest. The local creation script includes the k3s flag, and the existing local cluster was migrated using the [official existing-cluster procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster).
+The gateway Role can get and patch only `harbor-upstream-credentials`. It cannot list Secrets, read `harbor-app-secrets`, or create deployments. Each bundled upstream reads its own service authentication token from `harbor-app-secrets`; the gateway keeps a separate mutable copy. Editing or deleting a registry credential therefore cannot remove a token required for an upstream pod to start. To rotate a bundled service token, update its protected application Secret value, restart that service, and update its gateway credential. Application credentials are referenced through Secrets instead of being embedded in Helm values or release manifests. Kubernetes Secrets are not encryption by themselves; the cluster must enable encryption at rest. The local creation script includes the K3s encryption flag. For an existing unencrypted cluster, follow the [K3s migration procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster).
 
 ```powershell
 docker exec $projectServer k3s secrets-encrypt status
@@ -252,7 +222,7 @@ Expected results are encryption enabled, then `yes`, `no`, `no`. Encryption prot
 
 ### Live boundary and failure checks
 
-Run the live boundary checks against the local cluster with `uv run python scripts/verify_network.py`. It uses working gateway connections as positive controls, checks that peer/untrusted pods cannot reach protected Services, verifies the exact RBAC verbs, and removes its temporary probe pod. No Secret contents are printed. During a planned demo interruption, `uv run python scripts/verify_failure.py` deletes the shipping upstream pod by temporarily scaling its controller to zero, verifies fast discovery and healthy calls to the other two upstreams, then restores the replica and revokes its temporary key. Do not run this while someone is placing orders or recording a demo. The scripts save evidence under `.runtime`.
+Run the live boundary checks against the local cluster with `uv run python scripts/verify_network.py`. It uses working gateway connections as positive controls, checks that peer/untrusted pods cannot reach protected Services, verifies the exact RBAC verbs, and removes its temporary probe pod. No Secret contents are printed. During a maintenance window, `uv run python scripts/verify_failure.py` deletes the shipping upstream pod by temporarily scaling its controller to zero, verifies fast discovery and healthy calls to the other two upstreams, then restores the replica and revokes its temporary key. Run it only while other clients are idle. The scripts save evidence under `.runtime`.
 
 During that same maintenance window, `uv run python scripts/verify_registry_lifecycle.py` deletes the seeded shipping registration, restarts the gateway and shipping pod, verifies the registration stays deleted while the upstream starts with its separate service token, then restores the registration and its permissions. The restored registration receives a new ID; historical audit entries retain the original ID. The bootstrap marker in PostgreSQL prevents deleted default connections from returning on application restarts.
 
@@ -280,13 +250,13 @@ This creates a new mode-700 directory under `.secrets/backups`, keeps failed out
 
 Upgrade immutable image references and review rendered changes before applying. Database engine upgrades require their own supported migration procedure. A Helm rollback changes manifests and image versions; it does not reverse database schema changes, restore deleted orders, or revert PVC contents.
 
-For the local acceptance scenario, `uv run python scripts/verify_release.py` records non-sensitive user/product/order IDs and PVC identities, restarts WordPress and both database pods, and checks that those records persist. It then changes only the gateway CPU limit through a new Helm revision, rolls back to the compatible revision it started from, and checks the original configuration and records. This deliberately uses unchanged image tags and proves configuration rollback, not old application-binary or database recovery. Run it only while other clients are idle.
+For a local persistence check, `uv run python scripts/verify_release.py` records non-sensitive user/product/order IDs and PVC identities, restarts WordPress and both database pods, and checks that those records persist. It then changes only the gateway CPU limit through a new Helm revision, rolls back to the compatible revision it started from, and checks the original configuration and records. This checks retained data and configuration rollback with unchanged images. Use the separate version drill below to test replacement application binaries. Run it only while other clients are idle.
 
-#### Demonstrate an application version upgrade and rollback
+#### Test an application upgrade and rollback
 
-`scripts/verify_application_release.py` performs a separate A → B → A drill on an explicitly selected isolated release. Provision that release with its own namespace, Secrets, PostgreSQL, MariaDB, WordPress and PVCs. Use separate console/store hostnames and seed an administrator, a member, products and an order. Never label the normal demo or a production namespace as the drill target. The script does not create or delete environments.
+`scripts/verify_application_release.py` performs a separate A → B → A drill on an explicitly selected isolated release. Provision that release with its own namespace, Secrets, PostgreSQL, MariaDB, WordPress and PVCs. Use separate console/store hostnames and seed an administrator, a member, products and an order. Never label a shared or production namespace as the drill target. The script does not create or delete environments.
 
-Build A from the known baseline source and B from the completed feature source, using distinct version tags or registry digests for both the shared gateway/upstream image and dashboard image. For the observability change, the baseline source is `d5614f9`. Install A using the same chart and values the drill will use for B. Keep the database models and migration code identical. Build sequentially on small hosts; a second namespace still needs independent data workloads and volumes.
+Build A from the baseline source and B from the candidate source, using distinct version tags or registry digests for both the shared gateway/upstream image and dashboard image. Install A using the same chart and values the drill will use for B. Keep the database models and migration code identical. Build sequentially on small hosts; a second namespace still needs independent data workloads and volumes.
 
 Create a private JSON credential file containing `admin_email`, `admin_password`, `member_email` and `member_password` for this isolated release. Keep the exact source checkout used to build B available to `--candidate-source`. The script checks A's running schema source against that checkout before any mutation, and checks B's running application source against it after deployment.
 
@@ -299,8 +269,8 @@ kubectl --context k3d-harbor-release label namespace harbor-release \
 uv run python scripts/verify_application_release.py \
   --context k3d-harbor-release --namespace harbor-release --release harbor-release \
   --base http://release.localhost:8080 \
-  --a-app harbor:a-d5614f9 --a-dashboard harbor-dashboard:a-d5614f9 \
-  --b-app harbor:b-observability-v1 --b-dashboard harbor-dashboard:b-observability-v1 \
+  --a-app harbor:baseline-v1 --a-dashboard harbor-dashboard:baseline-v1 \
+  --b-app harbor:candidate-v2 --b-dashboard harbor-dashboard:candidate-v2 \
   --candidate-source . --credentials .secrets/release-drill.json \
   --report .runtime/application-release.json
 ```
@@ -309,7 +279,7 @@ Repeat that command with `--execute` to run the drill while the isolated store i
 
 The same two temporary personal keys and browser sessions must work at A, B and restored A. Each stage checks member write denial, administrator/member discovery, and real read calls through all three upstreams. It compares user roles, registry permission fingerprints, Alembic versions, product/order content fingerprints, the privacy notice, retained PVC UIDs and bound volume names. The data pods must remain unchanged. Customer data, passwords and tokens are excluded from the report.
 
-Once an upgrade is attempted, the script attempts rollback in `finally`, including after a failed Helm upgrade or failed B checks, then revokes its temporary keys and sessions. It writes failure evidence even when recovery fails and exits nonzero; inspect `rollback_verified` before treating a failed drill as recovered. Forced process termination or host loss cannot execute cleanup. Preserve the isolated environment and report for diagnosis in that case. A passed result proves compatible application binaries were replaced and restored with retained data; it does not demonstrate a database downgrade or backup restoration. Completed runs belong in the [verification record](verification.md) with their actual image identities and timestamps.
+Once an upgrade is attempted, the script attempts rollback in `finally`, including after a failed Helm upgrade or failed B checks, then revokes its temporary keys and sessions. It writes failure evidence even when recovery fails and exits nonzero; inspect `rollback_verified` before treating a failed drill as recovered. Forced process termination or host loss cannot execute cleanup. Preserve the isolated environment and report for diagnosis in that case. A passed result verifies compatible application binaries were replaced and restored with retained data. Database downgrades and backup restoration require separate checks. Retain the private report with the release artifacts.
 
 ```sh
 helm history harbor -n harbor
@@ -328,13 +298,11 @@ Restore into a separate recovery cluster or namespace first. Use database and ap
 4. Extract `wordpress-content.tar.gz` into the mounted WordPress PVC using a temporary recovery pod with UID/GID 33. Preserve file contents and ownership. Transfer the PostgreSQL dump and archive as binary streams; do not decode them through a text pipeline.
 5. Start compatible application workloads and validate user and store record counts, login, checkout and MCP calls before switching traffic. Keep the original volumes and backup until recovery is verified.
 
-Keep recovery resources under Helm's field manager from the start where possible. Manual `kubectl` application can leave shared field ownership that conflicts with later Helm 4 upgrades. Inspect `managedFields`, compare the live resource with the intended chart, and deliberately transfer ownership only for the known recovery-created resources. Removing a temporary recovery manager's entry requires a metadata backup and verification that no resource specification or content changes. `--force-conflicts` alone may leave unchanged fields shared, so it is not a complete ownership handoff. Do not clear unrelated managers or add force flags to normal deployment commands.
+Create recovery resources through Helm where possible. Manually applied resources can retain field ownership that conflicts with later Helm upgrades. Review the affected resources and their `managedFields` before transferring ownership; do not add force flags to routine deployments.
 
 Restore `development.json` and `gemini-api-key.txt` privately before using local maintenance scripts. Restore saved `local-settings.json` to `.runtime`, adjusting the target cluster and namespace for the recovery environment while retaining the correct database identity. These imports replace data and remain deliberate operator steps.
 
 PVCs have `helm.sh/resource-policy: keep`. `uninstall.ps1` leaves them and both external Secrets in place. Deleting the k3d cluster or its Docker volumes is a separate destructive action and is intentionally not included in the teardown helper.
-
-The [verification record](verification.md) dates the completed operational checks and distinguishes pod replacement, configuration rollback and actual backup restoration.
 
 ## Troubleshooting
 
@@ -347,9 +315,15 @@ The [verification record](verification.md) dates the completed operational check
 | Chat reports unavailable, quota or provider errors | Check the configured Gemini key and provider availability |
 | Browser shows old code after source edits | Rebuild images, deploy and reload; source changes alone do not update pods |
 
+### Repair non-loopback port bindings
+
+Bootstrap refuses to resume a cluster whose published ports bind outside loopback. To repair that condition, take a backup with `./scripts/backup.ps1`, preview `./scripts/limit-local-bindings.ps1`, then run it with `-Apply` during a maintenance window. The helper replaces only the project's load balancer, preserves the server and data volumes, and checks their identities afterward. If interrupted, rerun it to resume from its private state file. Do not delete the cluster to change bindings.
+
+Inspect `docker inspect $projectLoadBalancer --format '{{json .HostConfig.PortBindings}}'` using the container selected above. All published entries must use `127.0.0.1`. Confirm that the dashboard and API respond on loopback and reject connections through the host's non-loopback address.
+
 ### Cluster resume and stale proxy addresses
 
-Use `stop.ps1` and `bootstrap.ps1` for the normal local lifecycle. Resuming an existing cluster now checks the host API with bounded retries and refreshes only the project load balancer if the API is healthy inside the node but unavailable on the host. Deployment then recomputes the narrow API-server egress CIDR. Missing local credentials with retained project Secrets or volumes stop bootstrap instead of silently generating new database passwords. The isolated recovery and credential-guard cases can be run with `pwsh -File scripts/test-local-recovery.ps1`.
+Use `stop.ps1` and `bootstrap.ps1` for the normal local lifecycle. Resuming an existing cluster checks the host API with bounded retries and refreshes only the project load balancer if the API is healthy inside the node but unavailable on the host. Deployment then recomputes the narrow API-server egress CIDR. Missing local credentials with retained project Secrets or volumes stop bootstrap instead of silently generating new database passwords. The isolated recovery and credential-guard cases can be run with `pwsh -File scripts/test-local-recovery.ps1`.
 
 A manual `docker restart` of only the k3d server can change its Docker-network IP while the project load balancer still caches the old address. For that specific condition outside normal bootstrap, restart only the project's load-balancer container selected in [the local context procedure](#select-the-local-context), wait for its proxy to start, then run `deploy.ps1`. Node readiness alone does not prove upstream credentials are reachable. Do not restart Docker Desktop or delete other containers as a workaround.
 
@@ -362,7 +336,7 @@ docker restart $projectLoadBalancer
 
 ### Resource pressure and workload diagnostics
 
-On a 16 GiB Windows host, serialize image builds and browser runs. Severe host memory pressure can delay the whole Docker VM even when individual workload limits are respected. The probes allow 3 to 5 seconds and require sustained liveness failures before restarting; they do not make an overloaded host reliable.
+On a resource-constrained development host, serialize image builds and browser runs. Severe host memory pressure can delay the whole Docker VM even when individual workload limits are respected. The probes allow 3 to 5 seconds and require sustained liveness failures before restarting; they do not make an overloaded host reliable.
 
 ```powershell
 kubectl -n harbor get pods,pvc,ingress

@@ -1,38 +1,59 @@
-# Threat model
+# Security model
 
-## Assets and actors
+Harbor protects dashboard sessions, API keys, upstream credentials, the model-provider key and store data. Its main boundary is between a member and an administrator. It also treats registered MCP servers and their tool descriptions, schemas and results as untrusted input.
 
-Protected assets are upstream credentials, the LLM key, dashboard sessions, API keys, customer order data and store mutations. Actors are an administrator, a member, an unauthenticated network client, an untrusted MCP server and a compromised pod. Cluster administrators are outside the application isolation boundary.
+Cluster administrators and the host owner are trusted operators. A compromised gateway process can access the upstream credentials assigned to it. Harbor is designed for one team sharing one store, not mutually isolated tenants.
 
-| Threat | Control | Remaining limitation |
-| --- | --- | --- |
-| Member invokes an administrator tool by name | Same permission predicate filters listing and checks execution | Admins intentionally have access to all registered tools |
-| Revoked key continues on an open MCP connection | Database authentication on each request, including delegated sessions | Already dispatched operations may finish |
-| One member reads another member's records or confirmation | Audit query ownership and session-bound one-use confirmations | Members intentionally share permitted store data |
-| Tool target or permissions change while chat waits | Target-bound calls and confirmations; current authority checked again before dispatch; automatic chat calls must remain read-only | A change after dispatch cannot undo an upstream operation |
-| External client uses an administrator key for an unwanted write | Use member keys for clients that should only read; every call checks current role and tool permissions | Dashboard approval dialogs do not apply to direct administrator MCP calls |
-| Untrusted schema retrieves data or exhausts resources | Local references only, empty retrieval registry, bounded input, killable worker with a two-second execution deadline and Linux address-space limit; process startup has a separate five-second readiness limit | Both limits remain inside the outer tool/discovery deadline. Windows has deadline/input guards; memory-budget verification uses Linux containers |
-| Upstream steals a client credential | User keys and cookies are never forwarded upstream; only that upstream's configured credential is attached | An upstream sees its own credential and authorized arguments |
-| Server registration targets metadata or internal systems | Public HTTPS validation, exact internal allowlist, DNS validation at connect time, numeric-address connection and blocked redirects | Operator-approved internal hosts are trusted; gateway compromise bypasses application checks |
-| Upstream tool description manipulates the LLM | Descriptions/results treated as untrusted; role enforcement outside model; write confirmation; no secrets in model context | Prompt injection cannot be eliminated; an authorized user can still approve a bad action |
-| Slow upstream consumes gateway capacity | Bounded discovery, per-upstream concurrency, deadlines and result limits | A single-node system still has finite shared CPU and memory |
-| Tool arguments or result contain HTML/script | React escapes displayed text; no arbitrary upstream HTML rendering | External clients control their own rendering behavior |
-| Password guessing or abusive traffic | Argon2 passwords, two shared hashing slots, synchronized rate limits using trusted ingress client identity, request size limits | Limits are process-local; NAT clients may share an address; this is not a DDoS protection service |
-| Secret leaks via repo, Helm values, browser or logs | Ignored local secret files, referenced Kubernetes Secrets, raw and JSON-escaped credential redaction, write-only credential UI; invitation query strings excluded from access logs and referrers | Host owner and cluster administrators can read secrets |
-| Gateway pod obtains cluster control | Service account can only read/patch one named credential Secret | Gateway compromise still exposes all credentials in that Secret |
-| Pod bypasses gateway | Internal-only services, bearer credentials and enforced NetworkPolicies | Node compromise or cluster-admin privileges defeat pod isolation |
-| Duplicate write after a lost response | No automatic retry, explicit uncertain-outcome error, optional unique SKU reconciliation | No distributed exactly-once guarantee |
+## Identity and permissions
 
-## Shared credential implications
+Members can use tools explicitly classified as read operations. Administrators can use all registered tools and manage connections, permissions and accounts. Unknown tools default to administrator-only until reviewed.
 
-A member can read every store record permitted by the gateway even though they never see the store's credential. Hiding a credential alone is not authorization. Tool policies limit what the gateway will execute. Unknown tools default to administrator-only until reviewed. The demo policy permits members to read products and orders and use policies and shipping estimates. Only admins can create products or update orders.
+The same permission check filters MCP discovery and rejects direct calls. Hiding a button or tool name is not the authorization boundary. Database authentication runs on each request, including requests on an existing transport, so revoked keys and role changes take effect on the next request. An operation already dispatched may still finish.
 
-Gateway keys identify users at the gateway only. Passing them through would expose a reusable team credential to every upstream and blur which service is responsible for authorization. An upstream instead receives its own separately configured static credential. The audit log records the originating user before the upstream call.
+Members see their own Activity and keys. They can read any store records exposed by their permitted tools; Harbor does not provide per-customer or per-order access rules.
 
-## Operational boundaries
+Dashboard sessions use opaque tokens stored as hashes, HttpOnly cookies, origin checks and CSRF protection. Passwords use Argon2. API keys have sufficient random entropy for SHA-256 storage and are shown in full only when created.
 
-The sample store contains synthetic data. Free LLM provider terms may allow submitted content to improve products. Production operators must evaluate provider terms and minimize customer data before using a free tier with real customers.
+## Chat and write approval
 
-Local HTTP is limited to development. Production values require TLS at ingress and secure cookies. Internal HTTP and database links are not encrypted by a service mesh. Kubernetes Secret encryption protects datastore contents at rest, not credentials read by a running authorized process.
+The model chooses tools; the gateway independently authorizes execution. Dashboard chat pauses mutations for a one-use, session-bound confirmation. A proposal binds the intended tool to its connection, schema and permissions. Those values are checked again before dispatch. Automatic chat calls must still be read-only when execution begins.
 
-Keep dependencies pinned, restrict public registration of untrusted servers, review newly discovered tools, rotate credentials after suspected compromise and back up all persistent data. Do not expose local test fixtures or use the local values on a public server unchanged.
+External administrator clients can invoke write tools directly. The dashboard confirmation dialog does not apply to their calls. Use member keys for external clients that should only read.
+
+Untrusted descriptions or results may influence a model. Role checks, confirmation and credential isolation limit the consequences, but cannot prevent a user from approving an unwanted authorized action. Neither the model nor the browser receives upstream credentials.
+
+Assistant Markdown disables raw HTML, rejects unsafe link schemes and renders remote images as links rather than fetching them. User messages and displayed tool data remain escaped text. External clients are responsible for their own rendering.
+
+## Registered servers and network access
+
+Public upstreams must use HTTPS. URL validation blocks private, loopback, link-local and cloud metadata destinations except exact operator-configured internal hosts. DNS is checked at connection time, connections use the validated numeric address and redirects are blocked.
+
+Each upstream receives only its configured server credential. User API keys and session cookies are never forwarded. An upstream can see its own credential and the arguments of authorized calls, so register only services appropriate for that data.
+
+Kubernetes Services for upstreams and databases are internal. Default-deny NetworkPolicies allow only the required paths, and bundled upstreams also require bearer authentication. These controls require an enforcing network-policy controller; node or cluster-admin compromise defeats pod isolation.
+
+## Resource limits and failures
+
+Tool and discovery calls have deadlines, output limits and per-upstream concurrency limits. Untrusted schemas accept only in-document references and run in a killable worker. Validation has a two-second execution deadline, a separate five-second process readiness limit, structural input limits and a Linux memory limit. Both deadlines remain within the enclosing operation's timeout.
+
+Password hashing has two shared, non-queueing slots. Excess requests receive a temporary capacity error instead of allocating another Argon2 operation. Authentication and gateway traffic also have process-local rate limits. Trusted ingress configuration prevents clients from choosing an arbitrary source address through forwarded headers. Users behind the same NAT can still share a bucket.
+
+These controls bound ordinary application work; they do not provide distributed rate limiting, high availability or DDoS protection.
+
+Writes are not automatically retried. A response can be lost after the store commits an operation. Reconcile the store state before retrying; a unique SKU helps identify a product creation but does not guarantee exactly-once delivery.
+
+## Secrets and audit data
+
+The gateway's Kubernetes Role can get and patch one named mutable credential Secret. It cannot list other Secrets or create workloads. Bundled upstreams read separate service tokens from the application Secret, so deleting a registry credential does not prevent an upstream pod from starting.
+
+Helm references existing Secrets instead of embedding values in releases. K3s Secret encryption protects datastore files at rest. It does not hide values from a running authorized process or an operator with the node's keys.
+
+Audit records identify the originating user, server, tool, duration and outcome without storing raw customer order payloads. Credential redaction covers raw and JSON-escaped values; invitation query strings are excluded from access logs and referrers. Local credentials, backups and runtime reports must remain outside source control.
+
+## Deployment boundaries
+
+Use TLS and secure cookies for public access. Local HTTP is for development. Internal HTTP and database traffic are not encrypted by a service mesh.
+
+The bundled store starts with synthetic products and sample policy/shipping rules. Before handling real customers, configure business policies and evaluate what data is sent to the model provider. Treat prompts and tool results as data disclosed to that provider.
+
+Keep dependencies locked, review newly discovered tools, rotate exposed credentials and back up databases, WordPress content and the corresponding Secrets together. The [operations guide](operations.md#boundaries-and-secret-storage) covers network configuration, credential rotation and recovery.

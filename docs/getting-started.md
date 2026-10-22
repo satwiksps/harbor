@@ -1,8 +1,8 @@
-# Getting started
+# Installation
 
-Run Harbor and its storefront on a local Windows machine. Commands below run in PowerShell 7 from the repository root.
+Run the complete Harbor system on a Windows machine with Docker Desktop. Commands below run in PowerShell 7 from the repository root. For a Linux server deployment, use [Deployment and recovery](operations.md#vps-configuration).
 
-The result is a private local dashboard, a demo store and one MCP endpoint. The documentation website is not a hosted application.
+You will get a local console, a sample WooCommerce store and one MCP endpoint. You need access to the private application repository. If you already have an account on a running Harbor instance, go straight to [Using the console](user-guide.md).
 
 ## Prerequisites
 
@@ -13,12 +13,12 @@ The result is a private local dashboard, a demo store and one MCP endpoint. The 
 | Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/) | Installs the locked Python environment |
 | At least 8 GB allocated to Docker | The project node is capped at 6 GB |
 | Available ports 8080 and 8443 | Local ingress, bound to loopback |
-| Internet access for initial setup | Downloads images, dependencies and fonts |
+| Internet access for initial setup | Downloads images and dependencies |
 | Node.js 24, when developing the frontend or using MCP Inspector | Not required for the containerized dashboard build |
 
-On a 16 GB computer, run image builds and browser verification sequentially and leave sufficient free host memory. The bootstrap script installs the verified Helm and k3d versions under `.tools`.
+Leave enough free host memory for Windows and Docker in addition to the 6 GB cluster. Run image builds and browser tests sequentially on memory-constrained machines. The bootstrap script installs pinned Helm and k3d versions under `.tools`; you do not need to install them globally.
 
-The application repository is private. Obtain access, clone it and open PowerShell in the checkout before continuing.
+Clone the repository and open PowerShell in the checkout before continuing.
 
 ## Prepare the checkout
 
@@ -49,13 +49,13 @@ New-Item -ItemType Directory -Force .secrets | Out-Null
 notepad .secrets/gemini-api-key.txt
 ```
 
-Save and close the editor. Do not commit or share this file. The configured model is `gemini-3.1-flash-lite`. Use a free-tier project if available for your account and check [Google's current pricing and quota](https://ai.google.dev/gemini-api/docs/pricing) before sending requests. The application does not enable billing or switch keys when quota runs out.
+Save and close the editor. Do not commit or share this file. The configured model is `gemini-3.1-flash-lite`. Provider access, pricing and quota depend on your Google account; check [Google's pricing and quota](https://ai.google.dev/gemini-api/docs/pricing) before sending requests.
 
 You can skip the key to use management and MCP without chat. Chat reports that the provider is unavailable instead of returning a simulated answer. To configure it later, create the file and rerun bootstrap.
 
 ## Start the system
 
-For a retained installation that uses earlier resource names, first follow [the upgrade preservation steps](operations.md#preserve-an-existing-installation). Fresh installations use the Harbor defaults.
+For a new installation, run:
 
 ```powershell
 pwsh -File scripts/bootstrap.ps1
@@ -63,12 +63,14 @@ pwsh -File scripts/bootstrap.ps1
 
 Initial setup takes several minutes. The script:
 
-1. Verifies the local tools and starts the dedicated project cluster.
+1. Verifies the local tools and starts the dedicated `harbor` cluster.
 2. Generates random credentials in `.secrets/development.json` and creates Kubernetes Secrets.
 3. Builds and imports the application, dashboard and WordPress images.
 4. Installs the Helm chart and initializes the store and gateway.
 
-Rerunning bootstrap preserves existing store and gateway data. It does not replace connection credentials that administrators have changed. Keep `.secrets/development.json`: editing or replacing it does not rotate passwords already stored in the databases. See [operations](operations.md) for recovery procedures.
+Bootstrap switches the current Kubernetes context to `k3d-harbor`. It does not remove other Docker resources.
+
+Rerunning bootstrap preserves existing store and gateway data. It does not replace connection credentials that administrators have changed. Keep `.secrets/development.json`: editing or replacing it does not rotate passwords already stored in the databases. To resume or upgrade an existing installation, retain its credentials and follow [Deployment and recovery](operations.md).
 
 ## Sign in
 
@@ -89,11 +91,11 @@ Harbor and WordPress have separate accounts. The Harbor administrator credential
 
 1. Sign in to Harbor with `admin_email` and `admin_password`.
 2. Open **Connections**. WooCommerce, Store policies and Shipping should show **Connected**, with nine tools in total.
-3. Open the storefront. The initial catalog should contain three starter products.
+3. Open the storefront. A fresh installation contains three starter products.
 4. If chat is configured, ask `What products are in the store?` and expand the returned tool result. Without a provider key, the chat notice is expected.
 5. Open **Activity** after a tool call and check that it is attributed to your account.
 
-A Connected status confirms MCP discovery, not a successful WooCommerce request or working Gemini quota. The first read checks that additional path. Continue with the [user guide](user-guide.md) to create a product, check out and invite a member.
+A **Connected** status means Harbor can discover the service's tools. It does not verify a WooCommerce data request or Gemini quota. The first chat read checks both paths. Without chat, use [MCP Inspector](external-clients.md#mcp-inspector) to make a read call without a model provider. Continue with [Using the console](user-guide.md) to manage access and work with the store.
 
 If the page does not load, first check Docker and the bootstrap output. If a connection is Unreachable, open its error details. For a provider quota error, wait for quota to become available; changing gateway permissions will not fix it. The [troubleshooting guide](operations.md#troubleshooting) covers cluster and dependency failures.
 
@@ -105,4 +107,10 @@ Stop the project cluster while retaining its data:
 pwsh -File scripts/stop.ps1
 ```
 
-Run `pwsh -File scripts/bootstrap.ps1 -SkipBuild` to resume the same checkout with its existing images. After code changes, omit `-SkipBuild` so those changes are built. Deliberate removal is documented in `scripts/uninstall.ps1`; do not delete persistent volumes if you intend to keep orders. For retained credentials or local port recovery, use the [operations guide](operations.md).
+Resume the same checkout with its existing images:
+
+```powershell
+pwsh -File scripts/bootstrap.ps1 -SkipBuild
+```
+
+After code changes, omit `-SkipBuild` so the new images are built. For backups, removal or local port recovery, use [Deployment and recovery](operations.md).
