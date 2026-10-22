@@ -228,12 +228,14 @@ export function ConfirmModal({
   label,
   onConfirm,
   onClose,
+  danger = true,
 }: {
   title: string;
   description: string;
   label: string;
   onConfirm: () => Promise<void>;
   onClose: () => void;
+  danger?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -252,7 +254,7 @@ export function ConfirmModal({
           Cancel
         </button>
         <button
-          className="button danger-button"
+          className={`button ${danger ? "danger-button" : "primary"}`}
           disabled={busy}
           onClick={async () => {
             if (busy) return;
@@ -284,9 +286,10 @@ export function Toast({
   close: () => void;
 }) {
   useEffect(() => {
+    if (error) return;
     const timer = setTimeout(close, 4500);
     return () => clearTimeout(timer);
-  }, [close, message]);
+  }, [close, message, error]);
   return (
     <div
       className={`toast${error ? " danger" : ""}`}

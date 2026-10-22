@@ -55,12 +55,12 @@ export function Team({
   return (
     <>
       <PageHeading
-        eyebrow="TEAM ACCESS"
+        eyebrow={admin ? "TEAM ACCESS" : "PERSONAL ACCESS"}
         title={admin ? "Team & keys" : "My API keys"}
         description={
           admin
             ? "Manage workspace roles, invitations, and revocable API keys."
-            : "Personal access to your team tools, wherever you work."
+            : "Connect your editor or another MCP client to your team's tools."
         }
         action={
           admin && (
@@ -80,15 +80,11 @@ export function Team({
             <div>
               <h2>
                 Workspace members{" "}
-                <span className="count-bubble">
-                  {visibleMembers?.length ?? 0}
-                </span>
+                {members.data && (
+                  <span className="count-bubble">{visibleMembers?.length}</span>
+                )}
               </h2>
-              <p>
-                {admin
-                  ? "Manage who can use this workspace and what they can do."
-                  : "The people you share this workspace with."}
-              </p>
+              <p>Manage who can use this workspace and what they can do.</p>
             </div>
             <button
               className="text-button"
@@ -96,7 +92,8 @@ export function Team({
               disabled={members.loading}
               onClick={() => void members.refresh()}
             >
-              <RefreshCw size={15} /> Refresh
+              <RefreshCw size={15} className={members.loading ? "spin" : ""} />
+              Refresh
             </button>
           </div>
           {deactivatedCount > 0 && (
@@ -116,7 +113,7 @@ export function Team({
             <ErrorBox message={members.error} retry={members.refresh} />
           )}{" "}
           {!!visibleMembers?.length && (
-            <p className="table-scroll-hint">
+            <p className="table-scroll-hint management-scroll-hint">
               Scroll sideways for roles, status and actions.
             </p>
           )}
@@ -128,14 +125,14 @@ export function Team({
             <div className="simple-empty">
               {deactivatedCount ? "No active members." : "No members found."}
             </div>
-          ) : (
+          ) : members.data ? (
             <div
               className="table-scroll"
               tabIndex={0}
               role="region"
               aria-label="Workspace members"
             >
-              <table>
+              <table className="management-table members-table" role="table">
                 <thead>
                   <tr>
                     <th>Member</th>
@@ -151,9 +148,9 @@ export function Team({
                 <tbody>
                   {visibleMembers?.map((member) => (
                     <tr key={member.id}>
-                      <td>
+                      <td data-label="Member">
                         <div className="person-cell">
-                          <span className="avatar">
+                          <span className="avatar" aria-hidden="true">
                             {member.name.slice(0, 1).toUpperCase()}
                           </span>
                           <span>
@@ -165,7 +162,7 @@ export function Team({
                           </span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Role">
                         {admin && member.id !== user.id ? (
                           <select
                             aria-label={`Role for ${member.name}`}
@@ -189,16 +186,17 @@ export function Team({
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <Badge tone={member.active ? "good" : "neutral"}>
                           {member.active ? "Active" : "Deactivated"}
                         </Badge>
                       </td>
                       {admin && (
-                        <td className="align-right">
+                        <td className="align-right" data-label="Access">
                           {member.id !== user.id && (
                             <button
                               className="text-button"
+                              aria-label={`${member.active ? "Deactivate" : "Reactivate"} ${member.name}`}
                               onClick={() =>
                                 setMemberChange({
                                   member,
@@ -216,7 +214,7 @@ export function Team({
                 </tbody>
               </table>
             </div>
-          )}
+          ) : null}
           <div className="panel-footnote">
             <ShieldCheck size={15} />
             <span>
@@ -230,9 +228,16 @@ export function Team({
         <div className="panel-heading">
           <div>
             <h2>
-              API keys <span className="count-bubble">{activeKeys.length}</span>
+              API keys{" "}
+              {keys.data && (
+                <span className="count-bubble">{visibleKeys?.length}</span>
+              )}
             </h2>
-            <p>Connect an MCP client with a personal, revocable key.</p>
+            <p>
+              {admin
+                ? "Manage keys for your team. Each key follows its owner's permissions."
+                : "Create a separate key for each client. Revoke a key to stop its access."}
+            </p>
           </div>
           <div className="server-header-actions">
             <button
@@ -241,7 +246,8 @@ export function Team({
               disabled={keys.loading}
               onClick={() => void keys.refresh()}
             >
-              <RefreshCw size={15} /> Refresh
+              <RefreshCw size={15} className={keys.loading ? "spin" : ""} />
+              Refresh
             </button>
             <button
               className="button secondary small"
@@ -267,7 +273,7 @@ export function Team({
         )}
         {keys.error && <ErrorBox message={keys.error} retry={keys.refresh} />}{" "}
         {!!visibleKeys?.length && (
-          <p className="table-scroll-hint">
+          <p className="table-scroll-hint management-scroll-hint">
             Scroll sideways for key details and actions.
           </p>
         )}
@@ -284,14 +290,14 @@ export function Team({
               Create a key to use your team's tools from an external MCP client.
             </p>
           </Empty>
-        ) : (
+        ) : keys.data ? (
           <div
             className="table-scroll"
             tabIndex={0}
             role="region"
             aria-label="API keys"
           >
-            <table>
+            <table className="management-table keys-table" role="table">
               <thead>
                 <tr>
                   <th>Key</th>
@@ -307,7 +313,7 @@ export function Team({
               <tbody>
                 {visibleKeys?.map((key) => (
                   <tr key={key.id}>
-                    <td>
+                    <td data-label="Key">
                       <div className="key-name">
                         <KeyRound size={15} />
                         <strong>{key.name}</strong>
@@ -315,15 +321,19 @@ export function Team({
                       <code className="key-prefix">{key.prefix}••••</code>
                     </td>
                     {admin && (
-                      <td>
+                      <td data-label="Owner">
                         {members.data?.find(
                           (member) => member.id === key.user_id,
                         )?.name ?? `User ${key.user_id}`}
                       </td>
                     )}
-                    <td className="nowrap">{date(key.created_at)}</td>
-                    <td className="nowrap">{date(key.last_used_at)}</td>
-                    <td>
+                    <td className="nowrap" data-label="Created">
+                      {date(key.created_at)}
+                    </td>
+                    <td className="nowrap" data-label="Last used">
+                      {key.last_used_at ? date(key.last_used_at) : "Never used"}
+                    </td>
+                    <td data-label="Status">
                       <Badge
                         tone={
                           key.revoked_at
@@ -346,10 +356,11 @@ export function Team({
                             : "Active"}
                       </Badge>
                     </td>
-                    <td>
+                    <td data-label="Access">
                       {!key.revoked_at && (
                         <button
                           className="text-button danger-text"
+                          aria-label={`Revoke ${key.name}`}
                           onClick={() => setRevoke(key)}
                         >
                           Revoke
@@ -361,7 +372,7 @@ export function Team({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
         <div className="key-help">
           <Code2 size={18} />
           <div>
@@ -441,6 +452,10 @@ export function Team({
       )}{" "}
       {memberChange && (
         <ConfirmModal
+          danger={
+            memberChange.changes.role === "member" ||
+            memberChange.changes.active === false
+          }
           title={
             memberChange.changes.role
               ? `Change ${memberChange.member.name}'s role?`
@@ -455,7 +470,13 @@ export function Team({
                   ? "This person will be able to sign in and use their assigned permissions again."
                   : "This person will lose access to the workspace and gateway."
           }
-          label="Confirm change"
+          label={
+            memberChange.changes.role
+              ? "Change role"
+              : memberChange.changes.active
+                ? "Reactivate member"
+                : "Deactivate member"
+          }
           onClose={() => setMemberChange(undefined)}
           onConfirm={async () => {
             await api(`/members/${memberChange.member.id}`, {
@@ -558,7 +579,8 @@ function Invitations({ revision }: { revision: number }) {
           disabled={invites.loading}
           onClick={() => void invites.refresh()}
         >
-          <RefreshCw size={15} /> Refresh
+          <RefreshCw size={15} className={invites.loading ? "spin" : ""} />
+          Refresh
         </button>
       </div>
       {historyCount > 0 && (
@@ -578,7 +600,7 @@ function Invitations({ revision }: { revision: number }) {
         <ErrorBox message={invites.error} retry={invites.refresh} />
       )}{" "}
       {!!visibleInvites?.length && (
-        <p className="table-scroll-hint">
+        <p className="table-scroll-hint management-scroll-hint">
           Scroll sideways for invitation details.
         </p>
       )}
@@ -592,14 +614,14 @@ function Invitations({ revision }: { revision: number }) {
             ? "No pending invitations."
             : "No invitations have been created."}
         </div>
-      ) : (
+      ) : invites.data ? (
         <div
           className="table-scroll"
           tabIndex={0}
           role="region"
           aria-label="Invitations"
         >
-          <table>
+          <table className="management-table invitations-table" role="table">
             <thead>
               <tr>
                 <th>Email</th>
@@ -611,10 +633,12 @@ function Invitations({ revision }: { revision: number }) {
             <tbody>
               {visibleInvites?.map((invite) => (
                 <tr key={invite.id}>
-                  <td>{invite.email}</td>
-                  <td className="role-text">{invite.role}</td>
-                  <td>{date(invite.expires_at, true)}</td>
-                  <td>
+                  <td data-label="Email">{invite.email}</td>
+                  <td className="role-text" data-label="Role">
+                    {invite.role === "admin" ? "Administrator" : "Member"}
+                  </td>
+                  <td data-label="Expires">{date(invite.expires_at, true)}</td>
+                  <td data-label="Status">
                     <Badge
                       tone={
                         invite.accepted_at
@@ -636,7 +660,7 @@ function Invitations({ revision }: { revision: number }) {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

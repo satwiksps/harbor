@@ -7,6 +7,7 @@ import {
   Network,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   ShoppingBag,
   Trash2,
@@ -79,7 +80,11 @@ export function Connections({
       <PageHeading
         eyebrow="CONNECTED MCP SERVERS"
         title="Connections"
-        description="Manage the servers and tool permissions available through your gateway."
+        description={
+          admin
+            ? "Connect your tools and choose who can use them."
+            : "Review your team's connections and the tools you can access."
+        }
         action={
           admin ? (
             <button
@@ -97,12 +102,12 @@ export function Connections({
       <div className="section-overview">
         <div>
           <Network size={18} />
-          <strong>{servers?.length ?? 0}</strong>
+          <strong>{servers ? servers.length : "..."}</strong>
           <span>registered connections</span>
         </div>
         <div>
           <span className="status-dot is-good" />
-          <strong>{servers?.filter(healthy).length ?? 0}</strong>
+          <strong>{servers ? servers.filter(healthy).length : "..."}</strong>
           <span>available now</span>
         </div>
         <button
@@ -124,8 +129,9 @@ export function Connections({
         <div className="panel">
           <Empty icon={<Network size={30} />} title="No connections yet.">
             <p>
-              Connect an MCP server to make its tools available through the
-              gateway.
+              {admin
+                ? "Connect an MCP server to make its tools available through the gateway."
+                : "Ask an administrator to connect a server so your team can start using its tools."}
             </p>
             {admin && (
               <button
@@ -155,7 +161,9 @@ export function Connections({
                   </div>
                   <div>
                     <h2>{server.name}</h2>
-                    <code className="server-url">{server.url}</code>
+                    <code className="server-url" title={server.url}>
+                      {server.url}
+                    </code>
                   </div>
                 </div>
                 <div className="server-header-actions">
@@ -210,16 +218,21 @@ export function Connections({
                   <span className="meta-separator" />
                   Streamable HTTP
                 </span>
-                <span>Last checked {date(server.last_checked_at)}</span>
+                <span>
+                  {server.last_checked_at
+                    ? `Last checked ${date(server.last_checked_at)}`
+                    : "Not checked yet"}
+                </span>
               </div>
               <details className="server-tools">
                 <summary>
                   <span>
                     <ShieldCheck size={16} />
-                    {server.tools?.length ?? 0} discovered tools
+                    {server.tools?.length ?? 0} discovered{" "}
+                    {server.tools?.length === 1 ? "tool" : "tools"}
                   </span>
                   <span>
-                    Permissions & schemas
+                    {admin ? "Permissions & schemas" : "Access & schemas"}
                     <ChevronDown size={15} />
                   </span>
                 </summary>
@@ -266,8 +279,9 @@ export function Connections({
       <div className="quiet-note">
         <ShieldCheck size={17} />
         <p>
-          New tools start with administrator-only access. Review each tool
-          before granting member access.
+          {admin
+            ? "New tools start with administrator-only access. Review each tool before granting member access."
+            : "Read access tools are available to members. Ask an administrator if you need a different tool or connection."}
         </p>
       </div>
       {editing && (
@@ -314,6 +328,13 @@ function ToolPermissions({
   const [changes, setChanges] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const tools = server.tools ?? [];
+  const query = search.trim().toLowerCase();
+  const visibleTools = tools.filter((tool) =>
+    `${tool.name} ${tool.description ?? ""}`.toLowerCase().includes(query),
+  );
+  const changeCount = Object.keys(changes).length;
   useEffect(() => {
     setChanges((previous) =>
       Object.fromEntries(
@@ -347,11 +368,30 @@ function ToolPermissions({
   return (
     <div className="tools-body">
       <p className="field-hint">
-        Read tools are available to members. Write tools are restricted to
-        administrators and require chat approval.
+        {admin
+          ? "Read access lets members and administrators use a tool. Write access is for administrators and requires approval in chat."
+          : "You can use tools marked Read access. Other tools are reserved for administrators."}
       </p>
-      {server.tools?.length ? (
-        server.tools.map((tool) => (
+      {tools.length > 0 && (
+        <div className="tools-toolbar">
+          <label className="tools-search">
+            <span className="sr-only">Search tools in {server.name}</span>
+            <Search size={16} aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Search tools"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          <span className="tools-result-count" role="status">
+            {query ? `${visibleTools.length} of ${tools.length}` : tools.length}{" "}
+            {tools.length === 1 ? "tool" : "tools"}
+          </span>
+        </div>
+      )}
+      {visibleTools.length ? (
+        visibleTools.map((tool) => (
           <div className="tool-row" key={tool.name}>
             <div>
               <code className="tool-name">{tool.name}</code>
@@ -365,8 +405,12 @@ function ToolPermissions({
             </div>
             {admin ? (
               <label className="permission-label">
+                <span className="permission-caption" aria-hidden="true">
+                  Access
+                </span>
                 <span className="sr-only">Permission for {tool.name}</span>
                 <select
+                  aria-label={`Permission for ${tool.name}`}
                   disabled={busy || pending}
                   value={changes[tool.name] ?? tool.permission ?? "admin"}
                   onChange={(e) => {
@@ -394,15 +438,26 @@ function ToolPermissions({
             )}
           </div>
         ))
+      ) : tools.length ? (
+        <div className="tools-empty">
+          <p>No tools match this search.</p>
+          <button className="text-button" onClick={() => setSearch("")}>
+            Clear search
+          </button>
+        </div>
       ) : (
         <p className="muted">
-          No tools discovered yet. Check the connection to retrieve its tool
-          catalog.
+          {admin
+            ? "No tools discovered yet. Check the connection to retrieve its tool catalog."
+            : "No tools have been discovered yet. An administrator can check this connection."}
         </p>
       )}
       {error && <ErrorBox message={error} />}{" "}
-      {Object.keys(changes).length > 0 && (
+      {changeCount > 0 && (
         <div className="tools-actions">
+          <span className="tools-change-count" role="status">
+            {changeCount} unsaved {changeCount === 1 ? "change" : "changes"}
+          </span>
           <button
             className="button secondary small"
             disabled={busy || pending}

@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   CircleHelp,
   KeyRound,
-  Layers3,
   LockKeyhole,
   LogOut,
   Menu,
@@ -293,15 +292,7 @@ function Workspace({
             <X size={20} />
           </button>
         </div>
-        <div className="workspace-label">
-          <span className="workspace-avatar">H</span>
-          <div>
-            <strong>Harbor workspace</strong>
-            <span>Team environment</span>
-          </div>
-          <Layers3 size={16} />
-        </div>
-        <p className="nav-label">WORKSPACE</p>
+        <p className="nav-label">YOUR WORKSPACE</p>
         <nav aria-label="Main navigation">
           {nav.map((item) => (
             <a
@@ -322,6 +313,16 @@ function Workspace({
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <a
+            className="sidebar-help"
+            href="https://docs.harbor.satwiksps.site/user-guide/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <CircleHelp size={17} />
+            Console guide
+            <ArrowUpRight size={14} />
+          </a>
           <div className="gateway-card">
             <span className="small-label">GATEWAY STATUS</span>
             <div>
@@ -347,12 +348,7 @@ function Workspace({
             <ShieldCheck size={16} />
             <span>Actions follow your team permissions.</span>
           </div>
-          <button
-            className="user-profile"
-            onClick={onLogout}
-            title={`Sign out of ${user.email}`}
-            aria-label="Sign out"
-          >
+          <div className="user-profile">
             <span className="avatar">
               {user.name.slice(0, 1).toUpperCase()}
             </span>
@@ -365,8 +361,15 @@ function Workspace({
                 {user.role === "admin" ? "Administrator" : "Team member"}
               </span>
             </span>
-            <LogOut size={17} />
-          </button>
+            <button
+              className="icon-button"
+              onClick={onLogout}
+              title={`Sign out of ${user.email}`}
+              aria-label="Sign out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </aside>
       {mobile && (
@@ -501,13 +504,13 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
           Independent engineering project <span>Harbor</span>
         </div>
       </div>
-      <div className="auth-form-side">
+      <main className="auth-form-side">
         {children}
         <p className="auth-support">
           <CircleHelp size={15} />
           Need access? Ask your workspace administrator.
         </p>
-      </div>
+      </main>
     </div>
   );
 }
@@ -592,7 +595,7 @@ function Login({
           )}
         </button>
         <p className="form-note">
-          Your session is protected. Your access stays yours.
+          Use the email associated with your workspace invitation.
         </p>
       </form>
     </AuthLayout>

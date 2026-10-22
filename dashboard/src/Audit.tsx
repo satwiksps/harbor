@@ -8,7 +8,14 @@ import {
   Search,
 } from "lucide-react";
 import { date } from "./api";
-import type { Audit, AuditSummary, AuditWindow, Member, Server, User } from "./api";
+import type {
+  Audit,
+  AuditSummary,
+  AuditWindow,
+  Member,
+  Server,
+  User,
+} from "./api";
 import {
   Badge,
   CopyButton,
@@ -72,20 +79,34 @@ export function AuditPage({
             : "Your tool calls, in one place. See what ran, when it ran, and how it went."
         }
         action={
-          <button
-            className="button secondary"
-            onClick={() => {
-              void records.refresh();
-              void summary.refresh();
-            }}
-            disabled={records.loading || summary.loading}
-          >
-            <RefreshCw
-              size={16}
-              className={records.loading || summary.loading ? "spin" : ""}
-            />
-            Refresh
-          </button>
+          <div className="page-actions">
+            <button
+              className="button secondary"
+              onClick={() => {
+                const history = document.getElementById(
+                  "activity-history-title",
+                );
+                history?.scrollIntoView({ block: "start" });
+                history?.focus({ preventScroll: true });
+              }}
+            >
+              View history
+            </button>
+            <button
+              className="button secondary"
+              onClick={() => {
+                void records.refresh();
+                void summary.refresh();
+              }}
+              disabled={records.loading || summary.loading}
+            >
+              <RefreshCw
+                size={16}
+                className={records.loading || summary.loading ? "spin" : ""}
+              />
+              Refresh
+            </button>
+          </div>
         }
       />
       <section
@@ -193,7 +214,9 @@ export function AuditPage({
       >
         <div className="audit-filters activity-history-heading">
           <div>
-            <h2 id="activity-history-title">Tool call history</h2>
+            <h2 id="activity-history-title" tabIndex={-1}>
+              Tool call history
+            </h2>
             <span>All time</span>
           </div>
           <label>
@@ -226,7 +249,7 @@ export function AuditPage({
           <ErrorBox message={records.error} retry={records.refresh} />
         )}
         {!!records.data?.items.length && (
-          <p className="table-scroll-hint">
+          <p className="table-scroll-hint management-scroll-hint">
             Scroll sideways for outcomes, timing and details.
           </p>
         )}
@@ -256,7 +279,7 @@ export function AuditPage({
             role="region"
             aria-label="Tool call history"
           >
-            <table className="audit-table">
+            <table className="audit-table management-table" role="table">
               <thead>
                 <tr>
                   <th>Tool call</th>
@@ -272,17 +295,17 @@ export function AuditPage({
               <tbody>
                 {records.data?.items.map((record) => (
                   <tr key={record.id}>
-                    <td>
+                    <td data-label="Tool call">
                       <code className="audit-tool">{record.tool_name}</code>
                       <span className="cell-subtitle">
                         {record.server_name || "Gateway"}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Initiated by">
                       <strong>{record.user_name || "Unknown user"}</strong>
                       <span className="cell-subtitle">{record.user_email}</span>
                     </td>
-                    <td>
+                    <td data-label="Outcome">
                       <Badge
                         tone={
                           record.outcome === "success"
@@ -297,14 +320,16 @@ export function AuditPage({
                         {outcomeLabel(record.outcome)}
                       </Badge>
                     </td>
-                    <td className="duration-cell">
+                    <td className="duration-cell" data-label="Duration">
                       <Clock3 size={13} />
                       {record.outcome === "pending"
                         ? "In progress"
                         : `${record.duration_ms.toLocaleString()} ms`}
                     </td>
-                    <td className="nowrap">{date(record.timestamp)}</td>
-                    <td>
+                    <td className="nowrap" data-label="When">
+                      {date(record.timestamp)}
+                    </td>
+                    <td data-label="Details">
                       <button
                         className="text-button"
                         onClick={() => setSelected(record)}
@@ -415,7 +440,9 @@ function ActivityOverview({
   updating: boolean;
 }) {
   const totals = data.totals;
-  const outcomes = Object.entries(totals.outcomes).filter(([, count]) => count > 0);
+  const outcomes = Object.entries(totals.outcomes).filter(
+    ([, count]) => count > 0,
+  );
   return (
     <>
       <div className="activity-summary-meta">
@@ -506,7 +533,8 @@ function ActivityOverview({
                   }`}
                   aria-hidden="true"
                 />
-                {outcomeLabel(outcome)} <strong>{count.toLocaleString()}</strong>
+                {outcomeLabel(outcome)}{" "}
+                <strong>{count.toLocaleString()}</strong>
               </li>
             ))}
           </ul>
@@ -541,7 +569,9 @@ function ActivityOverview({
                     <th scope="row">
                       {connection.server_name}
                       {connection.server_deleted && (
-                        <span className="cell-subtitle">Removed connection</span>
+                        <span className="cell-subtitle">
+                          Removed connection
+                        </span>
                       )}
                       {connection.server_id === null && (
                         <span className="cell-subtitle">
@@ -552,7 +582,9 @@ function ActivityOverview({
                     <td>{connection.calls.toLocaleString()}</td>
                     <td>
                       <span
-                        className={connection.failed_calls > 0 ? "has-failures" : ""}
+                        className={
+                          connection.failed_calls > 0 ? "has-failures" : ""
+                        }
                       >
                         {failureRate(connection.failure_rate)}
                       </span>
@@ -612,7 +644,9 @@ function ActivityOverview({
 }
 
 function windowLabel(window: AuditWindow) {
-  return { "1h": "Last hour", "24h": "Last 24 hours", "7d": "Last 7 days" }[window];
+  return { "1h": "Last hour", "24h": "Last 24 hours", "7d": "Last 7 days" }[
+    window
+  ];
 }
 
 function failureRate(value: number | null) {
