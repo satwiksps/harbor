@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" role="img" aria-labelledby="title">
+  <title id="title">Live</title>
+  <style>
+    circle { animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+    @media (prefers-reduced-motion: reduce) { circle { animation: none; } }
+  </style>
+  <circle cx="6" cy="6" r="4" fill="#16a34a"/>
+</svg>

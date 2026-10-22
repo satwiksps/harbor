@@ -19,7 +19,15 @@
   <a href="https://docs.harbor.satwiksps.site/threat-model/">Security</a>
 </p>
 
-A [Model Context Protocol gateway](https://docs.harbor.satwiksps.site/#how-it-works) for one team and one WooCommerce store, with [personal keys and role-based access](https://docs.harbor.satwiksps.site/user-guide/#roles-and-permissions).
+A [Model Context Protocol gateway](https://docs.harbor.satwiksps.site/#how-it-works) for WooCommerce with [personal keys and role-based access](https://docs.harbor.satwiksps.site/user-guide/#roles-and-permissions).
+
+This project is live at:
+
+<p>
+  <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture> <strong>Store:</strong> <a href="https://store.harbor.satwiksps.site/">https://store.harbor.satwiksps.site/</a><br>
+  <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture> <strong>Console:</strong> <a href="https://harbor.satwiksps.site/">https://harbor.satwiksps.site/</a><br>
+  <picture><source media="(prefers-reduced-motion: reduce)" srcset=".github/assets/live-dot-static.svg"><img src=".github/assets/live-dot.svg" alt="Live" width="12" height="12"></picture> <strong>Docs:</strong> <a href="https://docs.harbor.satwiksps.site/">https://docs.harbor.satwiksps.site/</a>
+</p>
 
 ## Run locally
 
