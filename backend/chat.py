@@ -1,25 +1,68 @@
 import asyncio
 import json
 import logging
+import math
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
+import httpx
 import httpx2
+import jsonschema
 from fastapi import HTTPException
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy import select
 
 from backend.catalog import SEARCH_NAME, ChatCatalog
-from backend.gateway import allowed
+from backend.gateway import UpstreamClient, allowed
 from backend.models import Confirmation, now
 from backend.security import delegate, refresh_principal
 from backend.tool_safety import target_hash
 
 logger = logging.getLogger(__name__)
+
+
+def provider_retry_delay(exc):
+    """Read only structured retry hints; provider messages can contain sensitive data."""
+    delays = []
+
+    def add(value):
+        try:
+            seconds = float(value)
+            if math.isfinite(seconds) and seconds >= 0:
+                delays.append(max(1, math.ceil(seconds)))
+        except (TypeError, ValueError, OverflowError):
+            pass
+
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", {})
+    retry_after = headers.get("Retry-After")
+    if retry_after is not None:
+        try:
+            add(float(retry_after))
+        except (TypeError, ValueError):
+            try:
+                retry_date = parsedate_to_datetime(retry_after)
+                add((retry_date - datetime.now(timezone.utc)).total_seconds())
+            except (TypeError, ValueError, OverflowError):
+                pass
+    details = getattr(exc, "details", {})
+    if isinstance(details, dict):
+        error = details.get("error", details)
+        entries = error.get("details", []) if isinstance(error, dict) else []
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict) or entry.get("@type") != (
+                "type.googleapis.com/google.rpc.RetryInfo"
+            ):
+                continue
+            delay = entry.get("retryDelay")
+            if isinstance(delay, str) and delay.endswith("s"):
+                add(delay[:-1])
+    # A bounded local guard, not a promise of the provider's quota-reset time.
+    return min(max(delays) if delays else 60, 86400)
 
 
 def confirmed_message(name, result):
@@ -45,6 +88,17 @@ class ChatAgent:
     def __init__(self, settings, db, gateway):
         self.settings, self.db, self.gateway = settings, db, gateway
         self.slots = asyncio.Semaphore(3)
+        self.provider_retry_at = 0.0
+
+    def check_provider_cooldown(self):
+        remaining = math.ceil(self.provider_retry_at - time.monotonic())
+        if remaining > 0:
+            raise HTTPException(
+                429,
+                f"Chat is temporarily rate limited. Retry in {remaining} seconds. "
+                "If this continues, check the Gemini project's quota.",
+                headers={"Retry-After": str(remaining)},
+            )
 
     async def call_gateway(
         self, principal, name, arguments, expected_target=None, require_read=True
@@ -65,7 +119,7 @@ class ChatAgent:
                     timeout=self.settings.tool_timeout_seconds + 5,
                     trust_env=False,
                 ) as http:
-                    async with Client(
+                    async with UpstreamClient(
                         streamable_http_client(
                             self.settings.internal_gateway_url, http_client=http
                         ),
@@ -96,6 +150,14 @@ class ChatAgent:
             )
         if not principal.session_id:
             raise HTTPException(401, "Chat requires a dashboard session")
+        self.check_provider_cooldown()
+        # No waiting queue: three long model requests must not retain an unbounded
+        # number of incoming conversations in memory. Acquisition below cannot
+        # suspend between this check and entering the semaphore.
+        if self.slots.locked():
+            raise HTTPException(
+                503, "Chat is busy. Please retry shortly.", headers={"Retry-After": "1"}
+            )
         catalog = ChatCatalog(self.gateway.catalog_for(principal))
         config = genai_types.GenerateContentConfig(
             system_instruction=(
@@ -146,6 +208,7 @@ class ChatAgent:
                         # Retry only an explicit provider 503, never the surrounding tool loop.
                         # SDK retries also include transport failures, so keep those disabled.
                         for attempt in range(2):
+                            self.check_provider_cooldown()
                             try:
                                 response = await client.models.generate_content(
                                     model=self.settings.gemini_model,
@@ -162,12 +225,22 @@ class ChatAgent:
                                 502,
                                 "The model returned no usable answer. Try a more specific request.",
                             )
-                        content = response.candidates[0].content
+                        candidate = response.candidates[0]
+                        finish_reason = getattr(candidate, "finish_reason", None)
+                        if finish_reason and finish_reason != "STOP":
+                            raise HTTPException(
+                                502,
+                                "The model could not complete an answer. Narrow or rephrase the request.",
+                            )
+                        content = candidate.content
                         functions = [
-                            p.function_call for p in content.parts or [] if p.function_call
+                            p.function_call for p in content.parts or []
+                            if p.function_call and not p.thought
                         ]
                         if not functions:
-                            text = "\n".join(p.text for p in content.parts or [] if p.text)
+                            text = "\n".join(
+                                p.text for p in content.parts or [] if p.text and not p.thought
+                            ).strip()
                             if not text:
                                 raise HTTPException(502, "The model returned an empty answer")
                             return {"message": text.replace(chr(0x2014), "; "), "tool_calls": calls}
@@ -208,6 +281,19 @@ class ChatAgent:
                             if (
                                 upstream.permissions.get(tool["name"], "write") != "read"
                             ):
+                                try:
+                                    await self.gateway.schema_checks.validate(
+                                        tool["inputSchema"], arguments
+                                    )
+                                except (ValueError, jsonschema.ValidationError, jsonschema.SchemaError):
+                                    replies.append(genai_types.Part.from_function_response(
+                                        name=function.name,
+                                        response={"error": (
+                                            "Tool arguments did not match its schema. "
+                                            "Correct the arguments and try again."
+                                        )},
+                                    ))
+                                    continue
                                 with self.db.session() as session:
                                     pending = Confirmation(
                                         user_id=principal.id,
@@ -255,8 +341,8 @@ class ChatAgent:
             raise HTTPException(422, "The model reached the tool loop limit. Narrow the request.")
         except HTTPException:
             raise
-        except TimeoutError:
-            logger.warning("Chat request failed: exception=TimeoutError status=504")
+        except (TimeoutError, httpx.TimeoutException, httpx2.TimeoutException) as exc:
+            logger.warning("Chat request failed: exception=%s status=504", type(exc).__name__)
             raise HTTPException(
                 504, "Chat timed out. Check the audit log before retrying a write."
             ) from None
@@ -269,9 +355,10 @@ class ChatAgent:
                 status if isinstance(status, int) else "unknown",
             )
             if status == 429:
-                raise HTTPException(
-                    429, "Gemini free-tier quota is exhausted. Wait and retry."
-                ) from None
+                self.provider_retry_at = max(
+                    self.provider_retry_at, time.monotonic() + provider_retry_delay(exc)
+                )
+                self.check_provider_cooldown()
             if status == 503:
                 raise HTTPException(
                     503, "The chat provider is temporarily unavailable. Please try again shortly."
