@@ -450,6 +450,7 @@ async def main():
             await assert_mobile_layout(page, "member-key-dialog")
             await page.keyboard.press("Escape")
             await expect(page.get_by_role("dialog")).to_have_count(0)
+            await assert_mobile_header(page, "member-team")
             await page.goto(BASE + "/#connections")
             await expect(
                 page.get_by_role("heading", name="Connections", exact=True)
@@ -463,6 +464,32 @@ async def main():
             ).to_have_count(0)
             await expect(page.get_by_role("switch")).to_have_count(0)
             await assert_mobile_layout(page, "member-connections")
+            await assert_mobile_header(page, "member-connections")
+
+        async def assert_mobile_header(page, view):
+            for role, name in [("button", "Open navigation"), ("link", "Open store")]:
+                control = page.get_by_role(role, name=name, exact=True)
+                await expect(control).to_be_visible()
+                geometry = await control.evaluate("""element => {
+                    const rect = element.getBoundingClientRect();
+                    return {
+                        left: rect.left, right: rect.right, top: rect.top,
+                        bottom: rect.bottom, width: rect.width, height: rect.height,
+                        viewportWidth: innerWidth, viewportHeight: innerHeight,
+                        centerReceivesPointer: element.contains(document.elementFromPoint(
+                            rect.left + rect.width / 2, rect.top + rect.height / 2))
+                    };
+                }""")
+                evidence = {"view": view, "control": name, **geometry}
+                report.setdefault("header_controls", []).append(evidence)
+                assert geometry["width"] >= 44 and geometry["height"] >= 44, evidence
+                assert 0 <= geometry["left"] < geometry["right"] <= geometry["viewportWidth"], (
+                    evidence
+                )
+                assert 0 <= geometry["top"] < geometry["bottom"] <= geometry["viewportHeight"], (
+                    evidence
+                )
+                assert geometry["centerReceivesPointer"], evidence
 
         for name, test in [
             ("Connection edits preserve fields changed elsewhere", dirty_patch),

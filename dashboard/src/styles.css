@@ -591,6 +591,8 @@ code {
 }
 .breadcrumb {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 13px;
   font-size: 13px;
@@ -599,12 +601,20 @@ code {
 .breadcrumb strong {
   color: #49534a;
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breadcrumb > .icon-button {
+  flex-shrink: 0;
 }
 .breadcrumb-divider {
   color: #c4c9bd;
 }
 .topbar-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
 }
