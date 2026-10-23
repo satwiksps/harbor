@@ -46,11 +46,19 @@ export function Connections({
   const pendingActions = useRef(new Set<string>());
   const [actionError, setActionError] = useState("");
   const admin = user.role === "admin";
-  async function update(server: Server, action: "refresh" | "toggle") {
-    const id = String(server.id);
-    if (pendingActions.current.has(id)) return;
+  function beginAction(id: string) {
+    if (!admin || pendingActions.current.has(id)) return false;
     pendingActions.current.add(id);
     setPending(new Set(pendingActions.current));
+    return true;
+  }
+  function endAction(id: string) {
+    pendingActions.current.delete(id);
+    setPending(new Set(pendingActions.current));
+  }
+  async function update(server: Server, action: "refresh" | "toggle") {
+    const id = String(server.id);
+    if (!beginAction(id)) return;
     setActionError("");
     try {
       await api(
@@ -70,9 +78,9 @@ export function Connections({
       );
     } catch (e) {
       setActionError(errorMessage(e));
+      await refresh();
     } finally {
-      pendingActions.current.delete(id);
-      setPending(new Set(pendingActions.current));
+      endAction(id);
     }
   }
   return (
@@ -237,11 +245,14 @@ export function Connections({
                   </span>
                 </summary>
                 <ToolPermissions
+                  key={`${server.id}:${server.url}`}
                   server={server}
                   admin={admin}
                   refresh={refresh}
                   notify={notify}
                   pending={pending.has(String(server.id))}
+                  beginAction={beginAction}
+                  endAction={endAction}
                 />
               </details>
               {admin && (
@@ -286,8 +297,13 @@ export function Connections({
       </div>
       {editing && (
         <ServerEditor
-          server={editing === "new" ? undefined : editing}
+          server={
+            editing === "new"
+              ? undefined
+              : servers?.find((server) => server.id === editing.id) ?? editing
+          }
           onClose={() => setEditing(undefined)}
+          onFailed={refresh}
           onSaved={async () => {
             setEditing(undefined);
             await refresh();
@@ -302,8 +318,11 @@ export function Connections({
           label="Remove connection"
           onClose={() => setDeleting(undefined)}
           onConfirm={async () => {
-            await api(`/servers/${deleting.id}`, { method: "DELETE" });
-            await refresh();
+            try {
+              await api(`/servers/${deleting.id}`, { method: "DELETE" });
+            } finally {
+              await refresh();
+            }
             notify("Connection removed.");
           }}
         />
@@ -318,14 +337,18 @@ function ToolPermissions({
   refresh,
   notify,
   pending,
+  beginAction,
+  endAction,
 }: {
   server: Server;
   admin: boolean;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
   pending: boolean;
+  beginAction: (id: string) => boolean;
+  endAction: (id: string) => void;
 }) {
-  const [changes, setChanges] = useState<Record<string, string>>({});
+  const [changes, setChanges] = useState(new Map<string, string>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -334,11 +357,11 @@ function ToolPermissions({
   const visibleTools = tools.filter((tool) =>
     `${tool.name} ${tool.description ?? ""}`.toLowerCase().includes(query),
   );
-  const changeCount = Object.keys(changes).length;
+  const changeCount = changes.size;
   useEffect(() => {
     setChanges((previous) =>
-      Object.fromEntries(
-        Object.entries(previous).filter(([name, permission]) => {
+      new Map(
+        [...previous].filter(([name, permission]) => {
           const tool = server.tools?.find(
             (candidate) => candidate.name === name,
           );
@@ -348,21 +371,24 @@ function ToolPermissions({
     );
   }, [server.tools]);
   async function save() {
-    if (busy || pending || !Object.keys(changes).length) return;
+    const id = String(server.id);
+    if (busy || pending || !changes.size || !beginAction(id)) return;
     setBusy(true);
     setError("");
     try {
       await api(`/servers/${server.id}/tools/permissions`, {
         method: "PATCH",
-        body: { permissions: changes },
+        body: { permissions: Object.fromEntries(changes) },
       });
-      setChanges({});
+      setChanges(new Map());
       await refresh();
       notify("Tool permissions updated.");
     } catch (e) {
       setError(errorMessage(e));
+      await refresh();
     } finally {
       setBusy(false);
+      endAction(id);
     }
   }
   return (
@@ -412,14 +438,14 @@ function ToolPermissions({
                 <select
                   aria-label={`Permission for ${tool.name}`}
                   disabled={busy || pending}
-                  value={changes[tool.name] ?? tool.permission ?? "admin"}
+                  value={changes.get(tool.name) ?? tool.permission ?? "admin"}
                   onChange={(e) => {
                     const value = e.target.value;
                     setChanges((previous) => {
-                      const next = { ...previous };
+                      const next = new Map(previous);
                       if (value === (tool.permission ?? "admin"))
-                        delete next[tool.name];
-                      else next[tool.name] = value;
+                        next.delete(tool.name);
+                      else next.set(tool.name, value);
                       return next;
                     });
                   }}
@@ -461,7 +487,7 @@ function ToolPermissions({
           <button
             className="button secondary small"
             disabled={busy || pending}
-            onClick={() => setChanges({})}
+            onClick={() => setChanges(new Map())}
           >
             Discard changes
           </button>
@@ -482,10 +508,12 @@ function ServerEditor({
   server,
   onClose,
   onSaved,
+  onFailed,
 }: {
   server?: Server;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  onFailed: () => Promise<void>;
 }) {
   const [name, setName] = useState(server?.name ?? "");
   const [slug, setSlug] = useState(server?.slug ?? "");
@@ -499,31 +527,72 @@ function ServerEditor({
   const [clearCredential, setClearCredential] = useState(false);
   const [enabled, setEnabled] = useState(server?.enabled ?? true);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
+  const previousServer = useRef(server);
+  useEffect(() => {
+    const previous = previousServer.current;
+    previousServer.current = server;
+    if (!server || !previous) return;
+    // Keep untouched fields current after a background refresh or a partial
+    // failure, while retaining the administrator's explicit edits.
+    setName((value) => (value === previous.name ? server.name : value));
+    setUrl((value) => (value === previous.url ? server.url : value));
+    setEnabled((value) => (value === previous.enabled ? server.enabled : value));
+    setAuthType((value) =>
+      value === previous.auth_type ? server.auth_type ?? "" : value,
+    );
+    setHeaderName((value) =>
+      value === (previous.header_name ?? "") ? server.header_name ?? "" : value,
+    );
+    if (server.url !== previous.url) {
+      setCredential("");
+      setClearCredential(false);
+      setError(
+        "The endpoint changed while this dialog was open. Review the URL and authentication before saving.",
+      );
+    }
+  }, [server]);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
     try {
       if (!name.trim()) throw new Error("Enter a connection name.");
+      // Send only explicit edits. A stale dialog must not overwrite another
+      // administrator's pause, endpoint, or authentication change.
+      const body = {
+        ...(!server || name.trim() !== server.name
+          ? { name: name.trim() }
+          : {}),
+        ...(!server || url.trim() !== server.url ? { url: url.trim() } : {}),
+        ...(!server || enabled !== server.enabled ? { enabled } : {}),
+        ...(!server ? { slug } : {}),
+        ...(authType && authType !== server?.auth_type
+          ? { auth_type: authType }
+          : {}),
+        ...(authType !== "none" && credential ? { credential } : {}),
+        ...(authType === "header" && headerName.trim() !== server?.header_name
+          ? { header_name: headerName.trim() }
+          : {}),
+        ...(clearCredential ? { clear_credential: true } : {}),
+      };
+      if (!Object.keys(body).length) {
+        onClose();
+        return;
+      }
       await api(server ? `/servers/${server.id}` : "/servers", {
         method: server ? "PATCH" : "POST",
-        body: {
-          name: name.trim(),
-          url: url.trim(),
-          enabled,
-          ...(!server ? { slug } : {}),
-          ...(authType ? { auth_type: authType } : {}),
-          ...(authType !== "none" && credential ? { credential } : {}),
-          ...(authType === "header" ? { header_name: headerName } : {}),
-          ...(clearCredential ? { clear_credential: true } : {}),
-        },
+        body,
       });
       await onSaved();
     } catch (e) {
       setError(errorMessage(e));
+      await onFailed();
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -544,6 +613,7 @@ function ServerEditor({
           Connection name
           <input
             required
+            disabled={busy}
             maxLength={100}
             value={name}
             onChange={(e) => {
@@ -568,7 +638,7 @@ function ServerEditor({
             pattern="[a-z][a-z0-9-]*"
             title="Start with a lowercase letter. Use lowercase letters, numbers, and hyphens."
             maxLength={24}
-            disabled={!!server}
+            disabled={busy || !!server}
             value={slug}
             onChange={(e) => {
               setSlugTouched(true);
@@ -585,6 +655,7 @@ function ServerEditor({
           <input
             required
             type="url"
+            disabled={busy}
             maxLength={2048}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -594,6 +665,7 @@ function ServerEditor({
         <label>
           Authentication
           <select
+            disabled={busy}
             value={authType}
             onChange={(e) => {
               setAuthType(e.target.value);
@@ -612,6 +684,7 @@ function ServerEditor({
             Header name
             <input
               required
+              disabled={busy}
               maxLength={100}
               value={headerName}
               onChange={(e) => setHeaderName(e.target.value)}
@@ -639,7 +712,7 @@ function ServerEditor({
                   ? "Leave blank to keep current credential"
                   : "Enter server credential"
               }
-              disabled={clearCredential}
+              disabled={busy || clearCredential}
             />
           </label>
         )}
@@ -647,6 +720,7 @@ function ServerEditor({
           <label className="checkbox-label">
             <input
               type="checkbox"
+              disabled={busy}
               checked={clearCredential}
               onChange={(e) => {
                 setClearCredential(e.target.checked);
@@ -659,6 +733,7 @@ function ServerEditor({
         <label className="checkbox-label">
           <input
             type="checkbox"
+            disabled={busy}
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
           />

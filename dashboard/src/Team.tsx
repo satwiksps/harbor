@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowUpRight,
@@ -8,7 +8,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { api, date, errorMessage } from "./api";
+import { ApiError, api, date, errorMessage } from "./api";
 import type { ApiKey, Health, Invite, Member, Role, User } from "./api";
 import {
   Badge,
@@ -394,7 +394,9 @@ export function Team({
       {admin && <Invitations revision={inviteRevision} />}
       {inviteOpen && (
         <InviteModal
+          gatewayUrl={health?.gateway_url}
           onClose={() => setInviteOpen(false)}
+          onFailed={() => setInviteRevision((v) => v + 1)}
           onCreated={() => {
             setInviteRevision((v) => v + 1);
             notify("Invitation created. Share the link with your teammate.");
@@ -406,6 +408,7 @@ export function Team({
           user={user}
           members={members.data ?? []}
           onClose={() => setKeyOpen(false)}
+          onFailed={keys.refresh}
           onCreated={async (key) => {
             setKeyOpen(false);
             setSecret(key);
@@ -444,8 +447,11 @@ export function Team({
           label="Revoke key"
           onClose={() => setRevoke(undefined)}
           onConfirm={async () => {
-            await api(`/keys/${revoke.id}`, { method: "DELETE" });
-            await keys.refresh();
+            try {
+              await api(`/keys/${revoke.id}`, { method: "DELETE" });
+            } finally {
+              await keys.refresh();
+            }
             notify("API key revoked.");
           }}
         />
@@ -479,11 +485,14 @@ export function Team({
           }
           onClose={() => setMemberChange(undefined)}
           onConfirm={async () => {
-            await api(`/members/${memberChange.member.id}`, {
-              method: "PATCH",
-              body: memberChange.changes,
-            });
-            await members.refresh();
+            try {
+              await api(`/members/${memberChange.member.id}`, {
+                method: "PATCH",
+                body: memberChange.changes,
+              });
+            } finally {
+              await members.refresh();
+            }
             notify("Team access updated.");
           }}
         />
@@ -666,20 +675,27 @@ function Invitations({ revision }: { revision: number }) {
 }
 
 function InviteModal({
+  gatewayUrl,
   onClose,
   onCreated,
+  onFailed,
 }: {
+  gatewayUrl?: string;
   onClose: () => void;
   onCreated: () => void;
+  onFailed: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
+  const [uncertain, setUncertain] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (submitting.current || uncertain) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
     try {
@@ -687,11 +703,41 @@ function InviteModal({
         method: "POST",
         body: { email, role },
       });
-      setUrl(new URL(result.invite_url, location.origin).toString());
+      if (typeof result?.invite_url !== "string" || !result.invite_url.trim())
+        throw new Error("The invitation response did not contain a link.");
+      const invitation = new URL(result.invite_url, location.origin);
+      const origins = new Set([location.origin]);
+      if (gatewayUrl) {
+        try {
+          const gateway = new URL(gatewayUrl);
+          if (
+            ["http:", "https:"].includes(gateway.protocol) &&
+            !gateway.username && !gateway.password
+          ) origins.add(gateway.origin);
+        } catch {
+          // An invalid health URL must not expand the accepted destinations.
+        }
+      }
+      if (
+        !origins.has(invitation.origin) ||
+        !invitation.pathname.startsWith("/invite/") ||
+        invitation.username || invitation.password
+      )
+        throw new Error("The invitation link was invalid.");
+      setUrl(invitation.toString());
       onCreated();
     } catch (e) {
-      setError(errorMessage(e));
+      if (!(e instanceof ApiError) || e.status >= 500 || e.status === 408) {
+        setUncertain(true);
+        setError(
+          "The invitation may have been created, but its link could not be confirmed. Close this dialog and review invitations before creating a replacement. Share only a link shown after a successful request.",
+        );
+      } else {
+        setError(errorMessage(e));
+      }
+      onFailed();
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -728,6 +774,7 @@ function InviteModal({
             Email address
             <input
               type="email"
+              disabled={busy || uncertain}
               maxLength={254}
               required
               value={email}
@@ -739,6 +786,7 @@ function InviteModal({
           <label>
             Workspace role
             <select
+              disabled={busy || uncertain}
               value={role}
               onChange={(e) => setRole(e.target.value as Role)}
             >
@@ -761,7 +809,7 @@ function InviteModal({
             >
               Cancel
             </button>
-            <button className="button primary" disabled={busy}>
+            <button className="button primary" disabled={busy || uncertain}>
               {busy ? (
                 <Spinner label="Creating invitation" />
               ) : (
@@ -779,24 +827,30 @@ function KeyModal({
   members,
   onClose,
   onCreated,
+  onFailed,
 }: {
   user: User;
   members: Member[];
   onClose: () => void;
   onCreated: (key: string) => Promise<void>;
+  onFailed: () => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [owner, setOwner] = useState(String(user.id));
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
+  const [uncertain, setUncertain] = useState(false);
   const owners = members.filter((member) => member.active);
   if (!owners.some((member) => String(member.id) === String(user.id)))
     owners.unshift({ ...user, active: true, created_at: "" });
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (submitting.current || uncertain) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
+    let attempted = false;
     try {
       if (!name.trim()) throw new Error("Enter a key name.");
       const selectedOwner = owners.find(
@@ -804,6 +858,7 @@ function KeyModal({
       );
       if (user.role === "admin" && !selectedOwner)
         throw new Error("Choose an active key owner before continuing.");
+      attempted = true;
       const result = await api<{ key: string; record: ApiKey }>("/keys", {
         method: "POST",
         body: {
@@ -813,10 +868,25 @@ function KeyModal({
             : {}),
         },
       });
+      if (typeof result?.key !== "string" || !result.key.trim()) {
+        throw new Error("The new key value was missing from the response.");
+      }
       await onCreated(result.key);
     } catch (e) {
-      setError(errorMessage(e));
+      if (
+        attempted &&
+        (!(e instanceof ApiError) || e.status >= 500 || e.status === 408)
+      ) {
+        setUncertain(true);
+        setError(
+          "The key may have been created, but its value could not be confirmed. Close this dialog, review the key list and revoke any new key with this name before creating a replacement.",
+        );
+      } else {
+        setError(errorMessage(e));
+      }
+      await onFailed();
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -836,6 +906,7 @@ function KeyModal({
           Key name
           <input
             required
+            disabled={busy || uncertain}
             minLength={2}
             maxLength={100}
             value={name}
@@ -847,7 +918,11 @@ function KeyModal({
         {user.role === "admin" && (
           <label>
             Key owner
-            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+            <select
+              disabled={busy || uncertain}
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+            >
               {owners.map((member) => (
                 <option value={String(member.id)} key={member.id}>
                   {member.name}
@@ -870,7 +945,7 @@ function KeyModal({
           >
             Cancel
           </button>
-          <button className="button primary" disabled={busy}>
+          <button className="button primary" disabled={busy || uncertain}>
             {busy ? <Spinner label="Creating key" /> : "Create key"}
           </button>
         </div>
