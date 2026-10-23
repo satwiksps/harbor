@@ -81,6 +81,50 @@ const suggestions = [
     text: "What shipping options are available?",
   },
 ];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function chatResponse(value: unknown): ChatResponse {
+  const invalid = () => {
+    throw new Error(
+      "The workspace returned an invalid chat response. Please retry.",
+    );
+  };
+  if (!isRecord(value) || typeof value.message !== "string") return invalid();
+  const calls = value.tool_calls ?? [];
+  if (
+    !Array.isArray(calls) ||
+    calls.some(
+      (call) =>
+        !isRecord(call) ||
+        typeof call.name !== "string" ||
+        !isRecord(call.arguments) ||
+        typeof call.is_error !== "boolean" ||
+        typeof call.duration_ms !== "number" ||
+        !Number.isFinite(call.duration_ms),
+    )
+  )
+    return invalid();
+  const confirmation = value.confirmation;
+  if (
+    confirmation != null &&
+    (!isRecord(confirmation) ||
+      typeof confirmation.id !== "string" ||
+      !confirmation.id ||
+      typeof confirmation.summary !== "string" ||
+      typeof confirmation.tool_name !== "string" ||
+      !isRecord(confirmation.arguments))
+  )
+    return invalid();
+  return {
+    ...value,
+    tool_calls: calls,
+    confirmation: confirmation ?? undefined,
+  } as unknown as ChatResponse;
+}
+
 export function Chat({
   user,
   health,
@@ -105,6 +149,8 @@ export function Chat({
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [clear, setClear] = useState(false);
   const [showLatest, setShowLatest] = useState(false);
+  const [retryAt, setRetryAt] = useState(0);
+  const [retryRemaining, setRetryRemaining] = useState(0);
   const [pendingDecision, setPendingDecision] = useState<
     "approve" | "cancel"
   >();
@@ -115,6 +161,25 @@ export function Chat({
   const focusNewChat = useRef(false);
   const inFlight = useRef(false);
   const wasBusy = useRef(false);
+  const request = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (!retryAt) return;
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
+      setRetryRemaining(remaining);
+      if (!remaining) setRetryAt(0);
+    };
+    update();
+    const timer = setInterval(update, 250);
+    return () => clearInterval(timer);
+  }, [retryAt]);
+  function respectRetryAfter(error: unknown) {
+    if (error instanceof ApiError && error.retryAfterSeconds) {
+      setRetryAt(Date.now() + error.retryAfterSeconds * 1000);
+      setRetryRemaining(Math.ceil(error.retryAfterSeconds));
+    }
+  }
   useEffect(() => {
     if (
       wasBusy.current &&
@@ -172,9 +237,16 @@ export function Chat({
     setConfirmation(result.confirmation);
   }
   async function sendRequest(next: Message[]) {
-    if (inFlight.current || confirmation || health?.chat_configured === false)
+    if (
+      inFlight.current ||
+      confirmation ||
+      Date.now() < retryAt ||
+      health?.chat_configured === false
+    )
       return;
     inFlight.current = true;
+    const controller = new AbortController();
+    request.current = controller;
     const context = chatContext(next);
     setRecentContext(
       context.length < next.length ||
@@ -184,20 +256,24 @@ export function Chat({
     setError("");
     setFailedRequest(undefined);
     try {
-      apply(
-        await api<ChatResponse>("/chat", {
+      const result = chatResponse(
+        await api<unknown>("/chat", {
           method: "POST",
+          signal: controller.signal,
           body: {
             messages: context,
           },
         }),
       );
+      if (!controller.signal.aborted) apply(result);
     } catch (e) {
+      if (controller.signal.aborted) return;
+      respectRetryAfter(e);
       setError(errorMessage(e));
       setFailedRequest(next);
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (!controller.signal.aborted) setBusy(false);
     }
   }
   async function send(e?: FormEvent) {
@@ -206,6 +282,7 @@ export function Chat({
       !input.trim() ||
       inFlight.current ||
       confirmation ||
+      Date.now() < retryAt ||
       health?.chat_configured === false
     )
       return;
@@ -219,19 +296,27 @@ export function Chat({
     await sendRequest(next);
   }
   async function decide(approve: boolean) {
-    if (!confirmation || inFlight.current) return;
+    if (!confirmation || inFlight.current || Date.now() < retryAt) return;
     inFlight.current = true;
+    const controller = new AbortController();
+    request.current = controller;
     setPendingDecision(approve ? "approve" : "cancel");
     setBusy(true);
     setError("");
     try {
-      const result = await api<ChatResponse>("/chat/confirm", {
-        method: "POST",
-        body: { id: confirmation.id, approve },
-      });
+      const result = chatResponse(
+        await api<unknown>("/chat/confirm", {
+          method: "POST",
+          signal: controller.signal,
+          body: { id: confirmation.id, approve },
+        }),
+      );
+      if (controller.signal.aborted) return;
       setConfirmation(undefined);
       apply(result);
     } catch (e) {
+      if (controller.signal.aborted) return;
+      respectRetryAfter(e);
       if (e instanceof ApiError && [403, 404, 409, 410].includes(e.status)) {
         setConfirmation(undefined);
         setError(
@@ -244,8 +329,10 @@ export function Chat({
       }
     } finally {
       inFlight.current = false;
-      setPendingDecision(undefined);
-      setBusy(false);
+      if (!controller.signal.aborted) {
+        setPendingDecision(undefined);
+        setBusy(false);
+      }
     }
   }
   return (
@@ -454,14 +541,14 @@ export function Chat({
               <div className="confirmation-actions">
                 <button
                   className="button secondary"
-                  disabled={busy}
+                  disabled={busy || retryRemaining > 0}
                   onClick={() => void decide(false)}
                 >
                   Cancel action
                 </button>
                 <button
                   className="button primary"
-                  disabled={busy}
+                  disabled={busy || retryRemaining > 0}
                   onClick={() => void decide(true)}
                 >
                   <Check size={16} />
@@ -494,12 +581,22 @@ export function Chat({
             </div>
           )}
           {error && <ErrorBox message={error} />}
+          {retryRemaining > 0 && (
+            <p className="field-hint">
+              Try again in {retryRemaining}{" "}
+              {retryRemaining === 1 ? "second" : "seconds"}. Your message will
+              not be sent automatically.
+            </p>
+          )}
           {failedRequest && (
             <button
               type="button"
               className="text-button"
               disabled={
-                busy || !!confirmation || health?.chat_configured === false
+                busy ||
+                !!confirmation ||
+                retryRemaining > 0 ||
+                health?.chat_configured === false
               }
               onClick={() => void sendRequest(failedRequest)}
             >
@@ -549,6 +646,7 @@ export function Chat({
                   !input.trim() ||
                   busy ||
                   !!confirmation ||
+                  retryRemaining > 0 ||
                   health?.chat_configured === false
                 }
                 aria-label="Send message"
