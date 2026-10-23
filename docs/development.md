@@ -66,10 +66,14 @@ $env:HARBOR_URL = 'http://harbor.localhost:8080'
 uv run python -m tests.browser_accessibility
 uv run python -m tests.browser_observability
 uv run python -m tests.browser_console
+uv run python -m tests.browser_auth_resilience
+uv run python -m tests.browser_chat_resilience
+uv run python -m tests.browser_management_resilience
+uv run python -m tests.browser_activity_resilience
 Remove-Item Env:HARBOR_URL
 ```
 
-They cover keyboard access, responsive layouts, Activity metrics and filters, error recovery, formatted replies, unsafe Markdown, reading position, approval focus, unsaved permission edits and member controls. Browser fixtures cannot establish that a deployed backend or provider works.
+They cover keyboard access, responsive layouts, Activity metrics and filters, formatted replies, unsafe Markdown, reading position, approval focus, unsaved permission edits and member controls. The resilience checks exercise expired sessions, account changes during pending requests, provider cooldowns, malformed replies, uncertain mutations and concurrent connection edits. CI runs all seven harnesses against a production frontend build. Browser fixtures cannot establish that a deployed backend or provider works.
 
 ## Checks against a running application
 

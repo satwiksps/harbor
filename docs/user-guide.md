@@ -50,7 +50,7 @@ Conversation content stays in memory in the current browser tab. Reloading, sign
 
 ### Provider rate limits
 
-If Gemini returns a quota error, chat shows how long to wait before trying again. Harbor pauses new model requests across users of that gateway process during this cooldown. It uses the provider's retry hint when available, otherwise 60 seconds. A cooldown ending does not guarantee that daily quota has reset. Connections, Activity and [direct MCP calls](external-clients.md#mcp-inspector) remain available without Gemini.
+If Gemini returns a quota error, chat keeps your message available to retry and shows a countdown before you can send it again. It does not resend automatically. Harbor pauses new model requests across users of that gateway process during this cooldown. It uses the provider's retry hint when available, otherwise 60 seconds. A cooldown ending does not guarantee that daily quota has reset. Connections, Activity and [direct MCP calls](external-clients.md#mcp-inspector) remain available without Gemini.
 
 [Gemini quotas](https://ai.google.dev/gemini-api/docs/rate-limits) apply per project, not per API key. Check the configured project's limits in Google AI Studio. Extra keys do not increase that project's allowance. To use less quota, ask focused questions, request smaller result pages, and start a new chat when earlier context is no longer needed. Harbor does not switch accounts or enable billing automatically.
 

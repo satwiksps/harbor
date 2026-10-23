@@ -71,6 +71,10 @@ jobs:
           uv run python -m tests.browser_observability
           uv run python -m tests.browser_accessibility
           uv run python -m tests.browser_console
+          uv run python -m tests.browser_auth_resilience
+          uv run python -m tests.browser_chat_resilience
+          uv run python -m tests.browser_management_resilience
+          uv run python -m tests.browser_activity_resilience
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
