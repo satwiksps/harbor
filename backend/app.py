@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request as StarletteRequest
 
 from backend.chat import ChatAgent
@@ -51,6 +52,7 @@ from backend.security import (
     digest,
     hash_password,
     random_token,
+    refresh_principal,
 )
 
 COOKIE = "harbor_session"
@@ -103,6 +105,26 @@ def public_server(server):
 class BoundaryMiddleware:
     def __init__(self, app, db, settings, limiter):
         self.app, self.db, self.settings, self.limiter = app, db, settings, limiter
+
+    def record_rejected_call(self, bearer, body):
+        if body.get("method") != "tools/call":
+            return
+        with self.db.session() as session:
+            key = session.scalar(select(ApiKey).where(ApiKey.token_hash == digest(bearer)))
+            user = session.get(User, key.user_id) if key else None
+            if user:
+                session.add(
+                    Audit(
+                        user_id=user.id,
+                        user_name=user.name,
+                        user_email=user.email,
+                        server_name="Gateway",
+                        tool_name=str(body.get("params", {}).get("name", "unknown"))[:150],
+                        request_id=str(body.get("id", uid()))[:100],
+                        outcome="denied",
+                        error="Gateway authentication or rate limit rejected the call",
+                    )
+                )
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -158,7 +180,11 @@ class BoundaryMiddleware:
             authorization = request.headers.get("authorization", "")
             bearer = authorization[7:] if authorization.lower().startswith("bearer ") else None
             try:
-                principal = authenticate(self.db, self.settings, bearer=bearer)
+                # A slow database connect must not stop the event loop, including
+                # health probes and requests which already have database capacity.
+                principal = await run_in_threadpool(
+                    authenticate, self.db, self.settings, bearer=bearer
+                )
                 self.limiter.check("mcp:" + principal.id, 120)
                 scope["harbor.principal"] = principal
             except HTTPException as exc:
@@ -166,32 +192,21 @@ class BoundaryMiddleware:
                 if bearer and not bearer.startswith("chat.") and request.method == "POST":
                     try:
                         body = await request.json()
-                        if body.get("method") == "tools/call":
-                            with self.db.session() as session:
-                                key = session.scalar(
-                                    select(ApiKey).where(ApiKey.token_hash == digest(bearer))
-                                )
-                                user = session.get(User, key.user_id) if key else None
-                                if user:
-                                    session.add(
-                                        Audit(
-                                            user_id=user.id,
-                                            user_name=user.name,
-                                            user_email=user.email,
-                                            server_name="Gateway",
-                                            tool_name=str(
-                                                body.get("params", {}).get("name", "unknown")
-                                            )[:150],
-                                            request_id=str(body.get("id", uid()))[:100],
-                                            outcome="denied",
-                                            error="Gateway authentication or rate limit rejected the call",
-                                        )
-                                    )
+                        await run_in_threadpool(self.record_rejected_call, bearer, body)
                     except Exception:
                         logger.warning("Unable to record rejected MCP request")
-                return await JSONResponse({"detail": exc.detail}, exc.status_code)(
+                return await JSONResponse(
+                    {"detail": exc.detail}, exc.status_code, headers=exc.headers
+                )(
                     scope, receive, send
                 )
+            except SQLAlchemyError:
+                logger.warning("Database unavailable during MCP authentication")
+                return await JSONResponse(
+                    {"detail": "Database is temporarily unavailable. Please retry shortly."},
+                    503,
+                    headers={"Retry-After": "1"},
+                )(scope, receive, send)
 
         async def secure_send(message):
             if message["type"] == "http.response.start":
@@ -282,6 +297,15 @@ def create_app(settings: Settings | None = None):
     async def integrity_error(request, exc):
         return JSONResponse({"detail": "That record already exists or is no longer available"}, 409)
 
+    @app.exception_handler(SQLAlchemyError)
+    async def database_error(request, exc):
+        logger.warning("Database unavailable during API request")
+        return JSONResponse(
+            {"detail": "Database is temporarily unavailable. Please retry shortly."},
+            503,
+            headers={"Retry-After": "1"},
+        )
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
         error = exc.errors()[0]
@@ -292,7 +316,9 @@ def create_app(settings: Settings | None = None):
         principal = authenticate(db, settings, cookie=request.cookies.get(COOKIE))
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             expected = csrf(settings.session_secret, principal.session_id)
-            if not hmac.compare_digest(request.headers.get("x-csrf-token", ""), expected):
+            if not hmac.compare_digest(
+                request.headers.get("x-csrf-token", "").encode(), expected.encode()
+            ):
                 raise HTTPException(403, "CSRF token is missing or invalid")
         return principal
 
@@ -306,6 +332,22 @@ def create_app(settings: Settings | None = None):
         if not server:
             raise HTTPException(404, "Server not found")
         return server
+
+    async def discard_unregistered_credential(key):
+        # The remote write may have committed before a disconnect or cancellation.
+        # Finish its compensating delete before releasing the registry mutation lock.
+        worker = asyncio.create_task(credentials.put(key, None))
+        cancelled = False
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                cancelled = True
+            except Exception:
+                break
+        worker.result()
+        if cancelled:
+            raise asyncio.CancelledError
 
     def validate_server(url, auth_type, header_name):
         try:
@@ -348,7 +390,7 @@ def create_app(settings: Settings | None = None):
         }
 
     @app.get("/health/live")
-    def live():
+    async def live():
         return {"status": "ok"}
 
     @app.get("/health/ready")
@@ -443,9 +485,13 @@ def create_app(settings: Settings | None = None):
                 session.scalars(
                     select(User)
                     .where(User.role == "admin", User.active.is_(True))
+                    .order_by(User.id)
                     .with_for_update()
                 )
             )
+            # This row lock may have waited behind another administrator's edit.
+            # Recheck the caller after that edit, before changing any account.
+            admin(refresh_principal(db, principal))
             user = session.get(User, user_id)
             if not user:
                 raise HTTPException(404, "Member not found")
@@ -543,6 +589,7 @@ def create_app(settings: Settings | None = None):
     @app.post("/api/servers", status_code=201)
     async def add_server(body: ServerBody, principal=Depends(admin)):
         async with gateway.registry_lock:
+            admin(refresh_principal(db, principal))
             validate_server(body.url, body.auth_type, body.header_name)
             if body.auth_type != "none" and not body.credential:
                 raise HTTPException(422, "A credential is required for authenticated servers")
@@ -550,14 +597,16 @@ def create_app(settings: Settings | None = None):
                 raise HTTPException(422, "Credential must fit in one HTTP header")
             server_id = uid()
             credential_key = f"upstream-{server_id}" if body.credential else None
-            if credential_key:
-                try:
-                    await credentials.put(credential_key, body.credential)
-                except Exception:
-                    raise HTTPException(
-                        503, "Cannot update the upstream credential Secret"
-                    ) from None
+            database_attempted = False
             try:
+                if credential_key:
+                    try:
+                        await credentials.put(credential_key, body.credential)
+                    except Exception:
+                        raise HTTPException(
+                            503, "Cannot update the upstream credential Secret"
+                        ) from None
+                database_attempted = True
                 with db.session() as session:
                     server = Upstream(
                         id=server_id,
@@ -571,9 +620,30 @@ def create_app(settings: Settings | None = None):
                     )
                     session.add(server)
                     session.flush()
-            except Exception:
+            except (Exception, asyncio.CancelledError):
+                if database_attempted:
+                    # A failed commit response does not prove the commit failed.
+                    # Never remove a credential that a saved connection may use.
+                    try:
+                        with db.session() as session:
+                            saved = session.get(Upstream, server_id) is not None
+                    except SQLAlchemyError:
+                        logger.warning("Connection save status is unknown; credential retained")
+                        raise HTTPException(
+                            503, "Connection save could not be confirmed. Refresh connections before retrying."
+                        ) from None
+                    if saved:
+                        raise HTTPException(
+                            503, "Connection was saved, but its response failed. Refresh connections before retrying."
+                        ) from None
                 if credential_key:
-                    await credentials.put(credential_key, None)
+                    try:
+                        await discard_unregistered_credential(credential_key)
+                    except Exception:
+                        logger.warning("Unused upstream credential cleanup was not confirmed")
+                        raise HTTPException(
+                            503, "Connection was not saved; credential cleanup could not be confirmed."
+                        ) from None
                 raise
         await gateway.refresh(server_id)
         with db.session() as session:
@@ -582,6 +652,7 @@ def create_app(settings: Settings | None = None):
     @app.patch("/api/servers/{server_id}")
     async def edit_server(server_id: str, body: ServerUpdate, principal=Depends(admin)):
         async with gateway.registry_lock:
+            admin(refresh_principal(db, principal))
             with db.session() as session:
                 server = require_server(session, server_id)
             values = body.model_dump(exclude_unset=True)
@@ -636,6 +707,7 @@ def create_app(settings: Settings | None = None):
     @app.delete("/api/servers/{server_id}")
     async def remove_server(server_id: str, principal=Depends(admin)):
         async with gateway.registry_lock:
+            admin(refresh_principal(db, principal))
             with db.session() as session:
                 server = require_server(session, server_id)
                 server.enabled, server.status = False, "Disabled"
@@ -663,6 +735,7 @@ def create_app(settings: Settings | None = None):
     @app.patch("/api/servers/{server_id}/tools/permissions")
     async def tool_permissions(server_id: str, body: PermissionUpdate, principal=Depends(admin)):
         async with gateway.registry_lock:
+            admin(refresh_principal(db, principal))
             with db.session() as session:
                 server = require_server(session, server_id)
                 names = {tool["name"] for tool in server.tools}

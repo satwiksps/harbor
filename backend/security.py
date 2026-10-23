@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import secrets
 import time
 from collections import defaultdict, deque
@@ -176,13 +177,23 @@ class RateLimiter:
 
     def _check(self, key: str, limit: int, window: int):
         instant = time.monotonic()
-        if len(self.buckets) > 4096:
+        if key not in self.buckets and len(self.buckets) >= 4096:
             self.buckets = defaultdict(
                 deque, {k: q for k, q in self.buckets.items() if q and q[-1] > instant - window}
             )
+            # Keep existing callers' limits intact under a flood of new identities.
+            # Evicting active buckets would let those callers reset their allowance.
+            if len(self.buckets) >= 4096:
+                raise HTTPException(
+                    429, "Too many requests. Retry shortly.", headers={"Retry-After": "1"}
+                )
         bucket = self.buckets[key]
         while bucket and bucket[0] <= instant - window:
             bucket.popleft()
         if len(bucket) >= limit:
-            raise HTTPException(429, "Too many requests. Retry shortly.")
+            retry_after = max(1, math.ceil(bucket[0] + window - instant))
+            raise HTTPException(
+                429, "Too many requests. Retry shortly.",
+                headers={"Retry-After": str(retry_after)},
+            )
         bucket.append(instant)
