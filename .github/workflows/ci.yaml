@@ -75,6 +75,22 @@ jobs:
           uv run python -m tests.browser_chat_resilience
           uv run python -m tests.browser_management_resilience
           uv run python -m tests.browser_activity_resilience
+      - name: Preserve failed browser check evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-check-evidence
+          path: |
+            .runtime/auth-resilience/
+            .runtime/chat-resilience/
+            .runtime/management-resilience/
+            .runtime/activity-resilience/
+            .runtime/console-regressions/
+            .runtime/accessibility/
+            .runtime/observability/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

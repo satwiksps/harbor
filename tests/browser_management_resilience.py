@@ -7,6 +7,7 @@ HARBOR_URL=http://127.0.0.1:5176 uv run python -m tests.browser_management_resil
 import asyncio
 import copy
 import json
+import traceback
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -41,7 +42,13 @@ SERVER = {
 
 async def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    report = {"complete": False, "scope": "browser-local fixtures", "checks": [], "failures": []}
+    report = {
+        "complete": False,
+        "scope": "browser-local fixtures",
+        "checks": [],
+        "failures": [],
+        "layouts": [],
+    }
     errors, unexpected = [], []
     state = {}
     invite_started, invite_release = asyncio.Event(), asyncio.Event()
@@ -192,10 +199,20 @@ async def main():
                 report["checks"].append(name)
                 print("PASS", name, flush=True)
             except Exception as exc:
-                report["failures"].append({"case": name, "error": str(exc)})
+                report["failures"].append(
+                    {
+                        "case": name,
+                        "error": str(exc),
+                        "type": type(exc).__name__,
+                        "traceback": traceback.format_exc(),
+                    }
+                )
                 print("FAIL", name, str(exc)[:250], flush=True)
                 await page.screenshot(
                     path=str(OUT / f"failure-{len(report['failures'])}.png"), full_page=True
+                )
+                (OUT / f"failure-{len(report['failures'])}-snapshot.txt").write_text(
+                    await page.locator("body").aria_snapshot(), encoding="utf-8"
                 )
             finally:
                 invite_release.set()
@@ -372,6 +389,46 @@ async def main():
             )
             assert state["invite_posts"] == 1
 
+        async def assert_mobile_layout(page, view):
+            layout = await page.evaluate("""async () => {
+                await document.fonts.ready;
+                let previous = "", stable = 0;
+                const samples = [];
+                for (let frame = 0; frame < 12 && stable < 3; frame++) {
+                    await new Promise(requestAnimationFrame);
+                    const size = [innerWidth, document.documentElement.scrollWidth,
+                        document.body.scrollWidth, document.body.scrollHeight];
+                    const current = JSON.stringify(size);
+                    stable = current === previous ? stable + 1 : 0;
+                    previous = current;
+                    samples.push(size);
+                }
+                return {
+                    url: location.href,
+                    viewport: innerWidth,
+                    documentWidth: document.documentElement.scrollWidth,
+                    bodyWidth: document.body.scrollWidth,
+                    fonts: document.fonts.status,
+                    stableFrames: stable,
+                    samples,
+                    overflowing: [...document.querySelectorAll('body *')].flatMap(element => {
+                        const rect = element.getBoundingClientRect();
+                        const style = getComputedStyle(element);
+                        if (!rect.width || !rect.height || style.visibility === 'hidden' ||
+                            rect.right <= innerWidth) return [];
+                        return [{tag: element.tagName, classes: element.className,
+                            text: (element.textContent || '').trim().slice(0, 120),
+                            left: rect.left, right: rect.right, width: rect.width,
+                            scrollWidth: element.scrollWidth, clientWidth: element.clientWidth,
+                            overflowX: style.overflowX, position: style.position}];
+                    }).slice(0, 25)
+                };
+            }""")
+            layout["view"] = view
+            report["layouts"].append(layout)
+            assert layout["stableFrames"] >= 3, f"Layout did not settle: {json.dumps(layout)}"
+            assert layout["documentWidth"] <= layout["viewport"], json.dumps(layout)
+
         async def member_mobile(page):
             state["role"] = "member"
             await page.set_viewport_size({"width": 320, "height": 812})
@@ -380,19 +437,32 @@ async def main():
                 page.get_by_role("heading", name="My API keys", exact=True)
             ).to_be_visible()
             await expect(
+                page.get_by_role("heading", name="No keys yet.", exact=True)
+            ).to_be_visible()
+            await expect(
                 page.get_by_role("button", name="Invite teammate", exact=True)
             ).to_have_count(0)
             await page.get_by_role("button", name="Create key", exact=True).click()
+            await expect(
+                page.get_by_role("dialog", name="Create an API key", exact=True)
+            ).to_be_visible()
             await expect(page.get_by_label("Key owner", exact=True)).to_have_count(0)
-            assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            await assert_mobile_layout(page, "member-key-dialog")
             await page.keyboard.press("Escape")
             await expect(page.get_by_role("dialog")).to_have_count(0)
             await page.goto(BASE + "/#connections")
             await expect(
+                page.get_by_role("heading", name="Connections", exact=True)
+            ).to_be_visible()
+            await expect(
+                page.get_by_role("heading", name="Store tools", exact=True)
+            ).to_be_visible()
+            await expect(page.locator(".server-url")).to_have_text(SERVER["url"])
+            await expect(
                 page.get_by_role("button", name="Add connection", exact=True)
             ).to_have_count(0)
             await expect(page.get_by_role("switch")).to_have_count(0)
-            assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            await assert_mobile_layout(page, "member-connections")
 
         for name, test in [
             ("Connection edits preserve fields changed elsewhere", dirty_patch),
