@@ -1,6 +1,8 @@
 """WooCommerce REST adapter. Store state stays owned by WooCommerce."""
 
+import asyncio
 import json
+import math
 from datetime import datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -17,6 +19,18 @@ class StoreError(Exception):
 
 
 MAX_RESPONSE_BYTES = 2_000_000
+REQUEST_TIMEOUT_SECONDS = 10
+
+
+def reject_json_constant(value: str):
+    raise ValueError("Non-finite JSON number")
+
+
+def finite_json_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("Non-finite JSON number")
+    return number
 
 
 def uncertain_error(message: str, method: str) -> StoreError:
@@ -152,8 +166,9 @@ class WooCommerce:
         _, headers, _ = signer.sign(
             signing_url, http_method=method, headers={"Content-Type": "application/json"}
         )
+        headers["Accept-Encoding"] = "identity"
         try:
-            async with httpx.AsyncClient(
+            async with asyncio.timeout(REQUEST_TIMEOUT_SECONDS), httpx.AsyncClient(
                 timeout=httpx.Timeout(8, connect=3),
                 follow_redirects=False,
                 transport=self.transport,
@@ -166,6 +181,12 @@ class WooCommerce:
                         raise StoreError(
                             "The store redirected the API request. Check the configured store URLs"
                         )
+                    encoding = response.headers.get("content-encoding", "identity")
+                    if encoding.strip().lower() not in {"", "identity"}:
+                        raise uncertain_error(
+                            "Compressed store responses are disabled to enforce the size limit",
+                            method,
+                        )
                     content = bytearray()
                     async for chunk in response.aiter_bytes():
                         if len(content) + len(chunk) > MAX_RESPONSE_BYTES:
@@ -173,7 +194,7 @@ class WooCommerce:
                                 "Store response is too large. Request fewer items", method
                             )
                         content.extend(chunk)
-        except httpx.TimeoutException:
+        except (TimeoutError, httpx.TimeoutException):
             raise uncertain_error("Store request timed out", method) from None
         except httpx.HTTPError:
             raise uncertain_error("The store connection failed", method) from None
@@ -184,7 +205,7 @@ class WooCommerce:
                 candidate = json.loads(content).get("code", code)
                 if isinstance(candidate, str) and candidate.replace("_", "").isalnum():
                     code = candidate[:80]
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, RecursionError):
                 pass
             if response.status_code >= 500:
                 raise uncertain_error(
@@ -193,8 +214,11 @@ class WooCommerce:
                 )
             raise StoreError(f"WooCommerce rejected the request ({response.status_code}, {code})")
         try:
-            return json.loads(content), dict(response.headers)
-        except ValueError:
+            payload = json.loads(
+                content, parse_constant=reject_json_constant, parse_float=finite_json_float
+            )
+            return payload, dict(response.headers)
+        except (ValueError, RecursionError):
             raise uncertain_error("The store returned an invalid JSON response", method) from None
 
     async def list_products(self, search: str = "", page: int = 1, per_page: int = 20) -> dict:

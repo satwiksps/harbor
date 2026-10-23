@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
@@ -250,6 +251,77 @@ async def test_oversized_response_stops_reading_and_closes_stream():
     with pytest.raises(StoreError, match="too large"):
         await wc.list_products()
     assert stream.reads == 2 and stream.closed
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+async def test_slow_response_has_total_deadline_and_closes_stream(monkeypatch, method):
+    class SlowStream(httpx.AsyncByteStream):
+        closed = False
+
+        async def __aiter__(self):
+            for _ in range(100):
+                await asyncio.sleep(0.01)
+                yield b" "
+
+        async def aclose(self):
+            self.closed = True
+
+    monkeypatch.setattr("upstreams.commerce.REQUEST_TIMEOUT_SECONDS", 0.04, raising=False)
+    stream = SlowStream()
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, stream=stream)
+
+    wc = WooCommerce("http://wordpress", "key", "secret", transport=httpx.MockTransport(handler))
+    with pytest.raises(StoreError, match="timed out") as raised:
+        async with asyncio.timeout(0.5):
+            await wc.request(method, "products")
+    assert stream.closed and len(requests) == 1
+    assert ("outcome is unknown" in str(raised.value)) == (method == "POST")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b'[{"id":1,"price":NaN}]', b'[{"id":1,"price":1e999}]', b"[" * 10000 + b"]" * 10000],
+    ids=["non-finite-number", "overflowing-number", "excessive-nesting"],
+)
+@pytest.mark.parametrize("method", ["GET", "POST"])
+async def test_unsafe_json_is_rejected_with_safe_write_outcome(body, method):
+    wc = WooCommerce(
+        "http://wordpress", "key", "secret",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, content=body)),
+    )
+    with pytest.raises(StoreError, match="invalid JSON") as raised:
+        await wc.request(method, "products")
+    assert ("outcome is unknown" in str(raised.value)) == (method == "POST")
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+async def test_compressed_store_response_is_rejected_before_decoding(method):
+    class CompressedStream(httpx.AsyncByteStream):
+        read = False
+        closed = False
+
+        async def __aiter__(self):
+            self.read = True
+            yield b"must not be decoded"
+
+        async def aclose(self):
+            self.closed = True
+
+    stream = CompressedStream()
+
+    def handler(request):
+        assert request.headers["Accept-Encoding"] == "identity"
+        return httpx.Response(200, headers={"Content-Encoding": "gzip"}, stream=stream)
+
+    wc = WooCommerce("http://wordpress", "key", "secret", transport=httpx.MockTransport(handler))
+    with pytest.raises(StoreError, match="Compressed store responses") as raised:
+        await wc.request(method, "products")
+    assert not stream.read and stream.closed
+    assert ("outcome is unknown" in str(raised.value)) == (method == "POST")
 
 
 @pytest.mark.parametrize(
