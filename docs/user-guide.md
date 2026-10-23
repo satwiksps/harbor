@@ -48,6 +48,14 @@ If a write times out, check the store before trying again. A lost response does 
 
 Conversation content stays in memory in the current browser tab. Reloading, signing out or starting a new chat clears it; switching workspace pages does not. Completed tool activity remains in PostgreSQL. Long chats send only a bounded recent context to Gemini, so restate an older detail if it is needed for the next request.
 
+### Provider rate limits
+
+If Gemini returns a quota error, chat shows how long to wait before trying again. Harbor pauses new model requests across users of that gateway process during this cooldown. It uses the provider's retry hint when available, otherwise 60 seconds. A cooldown ending does not guarantee that daily quota has reset. Connections, Activity and [direct MCP calls](external-clients.md#mcp-inspector) remain available without Gemini.
+
+[Gemini quotas](https://ai.google.dev/gemini-api/docs/rate-limits) apply per project, not per API key. Check the configured project's limits in Google AI Studio. Extra keys do not increase that project's allowance. To use less quota, ask focused questions, request smaller result pages, and start a new chat when earlier context is no longer needed. Harbor does not switch accounts or enable billing automatically.
+
+Chat accepts three simultaneous requests per gateway process. If all slots are occupied, it asks you to retry shortly instead of leaving another request waiting. Writes are never automatically repeated after a provider or connection failure.
+
 ## Use the sample store
 
 1. Open the storefront from the console's **Open store** link. Browse the catalog or a product page and choose **Add to cart**.
