@@ -39,7 +39,7 @@ export function AuditPage({
   const [person, setPerson] = useState("");
   const [window, setWindow] = useState<AuditWindow>("24h");
   const [offset, setOffset] = useState(0);
-  const [selected, setSelected] = useState<Audit>();
+  const [selectedRecord, setSelected] = useState<Audit>();
   const params = new URLSearchParams({
     limit: "25",
     offset: String(offset),
@@ -50,6 +50,9 @@ export function AuditPage({
   const records = useResource<{ items: Audit[]; total: number }>(
     `/audit?${params}`,
   );
+  const selected =
+    records.data?.items.find((record) => record.id === selectedRecord?.id) ??
+    selectedRecord;
   const summaryParams = new URLSearchParams({
     window,
     ...(server ? { server_id: server } : {}),
@@ -152,6 +155,9 @@ export function AuditPage({
               onChange={(e) => filter(setServer, e.target.value)}
             >
               <option value="">All connections</option>
+              {server && !servers.some((item) => String(item.id) === server) && (
+                <option value={server}>Unavailable connection (selected)</option>
+              )}
               {servers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
