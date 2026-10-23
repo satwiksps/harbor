@@ -19,6 +19,8 @@ class ProductDouble {
 class DatabaseDouble {
     public string $prefix = 'wp_';
     public string $last_error = '';
+    public function prepare($query, ...$arguments) { return $query; }
+    public function get_var($query) { return 1; }
     public function update($table, $set, $where) {
         global $api_keys;
         foreach ($api_keys as &$key) {
@@ -76,19 +78,73 @@ $starter = new class { public function get_sku() { return 'HARBOR-TOTE-01'; } };
 check(harbor_product_art($starter) === 'https://store.example.test/wp-content/harbor-assets/everyday-tote.svg', 'Starter art must resolve the new SKU and packaged asset path');
 echo "PASS: WooCommerce integration hooks and Harbor product art remain connected\n";
 
-// Exercise the registered checkout filter with WooCommerce's default float precision.
-function wc_get_weight($weight, $unit) { check($unit === 'kg', 'Rates must use kilograms'); return (float)$weight; }
+// Execute the actual bootstrap against isolated store state, including WooCommerce's
+// default pounds setting. A repeated bootstrap must not reinterpret existing weights.
+class WooCommerce {}
+class WC_Install {
+    public static function create_tables() {}
+    public static function create_pages() {}
+}
+class WC_Shipping_Zone {
+    public function __construct($id) {}
+    public function get_shipping_methods() {
+        return [(object)['id' => 'free_shipping', 'instance_id' => 1], (object)['id' => 'flat_rate', 'instance_id' => 2]];
+    }
+}
+class WC_Product_Simple {
+    private array $values = [];
+    public function __call($method, $arguments) {
+        check(str_starts_with($method, 'set_'), 'Unexpected product operation');
+        $this->values[substr($method, 4)] = $arguments[0];
+    }
+    public function save() { global $products; $products[] = $this->values; }
+}
+function get_user_by($field, $value) { return (object)['ID' => 1]; }
+function wc_api_hash($value) { return hash('sha256', $value); }
+function get_page_by_path($slug, $output, $types) { return null; }
+function flush_rewrite_rules($hard) {}
+define('OBJECT', 'OBJECT');
+putenv('WP_ADMIN_USER=test-admin');
+putenv('WOO_KEY=test-key');
+putenv('WOO_SECRET=test-secret');
+$options = [
+    'woocommerce_weight_unit' => 'lbs', 'woocommerce_cart_page_id' => 1,
+    'woocommerce_checkout_page_id' => 2, 'harbor_demo_privacy_page_id' => 3,
+];
+$posts = [1 => ['ID' => 1], 2 => ['ID' => 2]];
+$products = $api_keys = [];
+ob_start();
+require __DIR__ . '/../docker/wordpress/seed.php';
+ob_end_clean();
+check(get_option('woocommerce_weight_unit') === 'kg', 'A new demo store must interpret starter weights as kilograms');
+check(count($products) === 3 && array_column($products, 'weight') === ['0.5', '0.5', '0.5'], 'Each starter product must weigh 0.5 kg');
+$catalog = serialize($products);
+update_option('woocommerce_weight_unit', 'lbs');
+ob_start();
+require __DIR__ . '/../docker/wordpress/seed.php';
+ob_end_clean();
+check(get_option('woocommerce_weight_unit') === 'lbs', 'Repeated bootstrap must preserve administrator-selected units');
+check(serialize($products) === $catalog, 'Repeated bootstrap must preserve the existing catalog');
+echo "PASS: fresh bootstrap sets kilograms; repeat bootstrap preserves configured units and products\n";
+
+// Exercise the registered checkout filter with WooCommerce's unit conversion and float precision.
+function wc_get_weight($weight, $unit) {
+    check($unit === 'kg', 'Rates must use kilograms');
+    return (float)$weight * (get_option('woocommerce_weight_unit') === 'lbs' ? 0.45359237 : 1);
+}
 function wc_format_decimal($value) { return number_format((float)$value, 6, '.', ''); }
 class ShippingRateDouble {
     public function __construct(public string $method_id, public float $cost) {}
     public function set_cost($cost) { $this->cost = (float)$cost; }
 }
 $shipping_filter = $filters['woocommerce_package_rates'];
+update_option('woocommerce_weight_unit', 'kg');
 foreach ([
     ['standard first band', [['0.5', 1]], 'KA', 59.0],
     ['remote first band', [['0.5', 1]], 'AS', 99.0],
     ['started second band', [['0.51', 1]], 'KA', 79.0],
     ['quantity weight', [['0.5', 3]], 'KA', 99.0],
+    ['two starter products', [['0.5', 2]], 'KA', 79.0],
     ['default missing weight', [['', 1]], 'KA', 59.0],
     ['decimal boundary', [['0.4', 1], ['0.8', 1], ['0.3', 1]], 'KA', 99.0],
     ['remote decimal boundary', [['0.4', 1], ['0.8', 1], ['0.3', 1]], 'AS', 139.0],

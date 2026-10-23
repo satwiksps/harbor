@@ -3,7 +3,7 @@
 if (!class_exists('WooCommerce')) { throw new RuntimeException('WooCommerce is unavailable'); }
 WC_Install::create_tables();
 WC_Install::create_pages();
-require_once '/opt/harbor/migrate-brand.php';
+require_once __DIR__ . '/migrate-brand.php';
 harbor_migrate_brand();
 update_option('blogdescription', 'Useful things. Thoughtfully made.');
 update_option('woocommerce_currency', 'INR');
@@ -37,6 +37,9 @@ update_option('page_on_front', (int)get_option('woocommerce_shop_page_id'));
 // Classic shortcodes keep the storefront flow reliable without a payment extension.
 // Subsequent deployments must preserve pages edited by the store administrator.
 if (!get_option('harbor_seed_complete')) {
+    // Starter weights and the sample delivery rate table are expressed in kilograms.
+    // Do not reinterpret an existing catalog if an administrator later changes units.
+    update_option('woocommerce_weight_unit', 'kg');
     foreach (['cart' => '[woocommerce_cart]', 'checkout' => '[woocommerce_checkout]'] as $page => $content) {
         wp_update_post(['ID' => (int)get_option('woocommerce_' . $page . '_page_id'), 'post_content' => $content]);
     }
