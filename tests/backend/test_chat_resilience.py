@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -323,6 +324,64 @@ async def test_invalid_write_arguments_are_corrected_before_confirmation(
         pending = list(session.scalars(select(Confirmation)))
         assert len(pending) == 1
         assert pending[0].arguments == {"name": "Valid product"}
+
+
+@pytest.mark.parametrize("approve", [True, False])
+async def test_model_write_proposal_waits_for_its_original_session_decision(
+    environment, provider_wire, monkeypatch, approve
+):
+    from tests.backend.test_catalog import connect_fake_upstream
+
+    app, http = environment
+    seed_upstream(app)
+    name = tool_alias("woo", "create_product")
+    arguments = {"name": "Reviewed product"}
+    requests = provider_wire([answer([{"functionCall": {"name": name, "args": arguments}}])])
+    original_http = httpx2.AsyncClient
+    dispatched = connect_fake_upstream(app, monkeypatch)
+
+    proposed = await http.post(
+        "/api/chat",
+        json={"messages": [{"role": "user", "content": "Create a product named Reviewed product"}]},
+    )
+    assert proposed.status_code == 200, proposed.text
+    data = proposed.json()
+    proposal = data["confirmation"]
+    assert proposal["tool_name"] == name and proposal["arguments"] == arguments
+    assert data["tool_calls"] == [] and dispatched == []
+    assert len(requests) == 1
+
+    # Even the same administrator in another browser session cannot approve it.
+    async with original_http(
+        transport=httpx2.ASGITransport(app=app), base_url="http://testserver"
+    ) as other_session:
+        signed_in = await other_session.post(
+            "/api/auth/login",
+            json={
+                "email": app.state.settings.bootstrap_admin_email,
+                "password": app.state.settings.bootstrap_admin_password,
+            },
+        )
+        assert signed_in.status_code == 200
+        other_session.headers["X-CSRF-Token"] = signed_in.json()["csrf_token"]
+        denied = await other_session.post(
+            "/api/chat/confirm", json={"id": proposal["id"], "approve": True}
+        )
+        assert denied.status_code == 404
+        assert dispatched == []
+
+    decided = await http.post(
+        "/api/chat/confirm", json={"id": proposal["id"], "approve": approve}
+    )
+    assert decided.status_code == 200, decided.text
+    assert dispatched == ([("create_product", arguments)] if approve else [])
+    assert len(decided.json()["tool_calls"]) == int(approve)
+    replayed = await http.post(
+        "/api/chat/confirm", json={"id": proposal["id"], "approve": True}
+    )
+    assert replayed.status_code == 404
+    assert dispatched == ([("create_product", arguments)] if approve else [])
+    assert len(requests) == 1, "Approval must not ask the model to execute the write"
 
 
 async def test_model_thought_function_is_never_executed(
