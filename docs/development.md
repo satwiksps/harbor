@@ -111,6 +111,26 @@ uv run python -m tests.browser_acceptance
 
 `tests.browser_acceptance --audit-only` checks only Activity. It does not verify checkout or chat.
 
+### Five complete order journeys
+
+`tests.live_order_journey` places five synthetic cash-on-delivery orders, then retrieves each through administrator and member chat and MCP Inspector. It checks order amounts, quantities, shipping, write approvals and cancellation, hidden member write tools, direct-call denial, and Activity attribution. It also exercises desktop and narrow layouts.
+
+Install the [pinned MCP Inspector](#external-client-verification) first. The selected deployment needs an active member's `demo-member.json` beside `development.json`, as created by `tests.acceptance`, and these published starter products: `HARBOR-NOTEBOOK-01`, `HARBOR-BOTTLE-01` and `HARBOR-TOTE-01`. Keep their standard prices and 0.5 kg weight. For a hosted test installation, set the [deployment URLs, credentials and evidence directory](#testing-a-public-deployment) before running:
+
+```powershell
+uv run python -m tests.live_order_journey
+```
+
+This uses the deployment's configured Gemini key, consumes provider quota and honors `Retry-After` within a bounded retry budget. It cancels its own test orders and revokes its temporary keys; inspect the private report for cleanup failures. Cancelled orders remain in the store's history.
+
+To continue an interrupted run, pass the report path printed by the command:
+
+```powershell
+uv run python -m tests.live_order_journey --resume '.runtime/order-journey/<run>/report.json'
+```
+
+Resume reuses a recorded successful checkout without placing that order again. It refuses to resubmit an uncertain checkout. Reconcile that attempt in the store before continuing; do not start another run to bypass the guard.
+
 ### Testing a public deployment
 
 Set both application URLs and use that deployment's credentials. Copy its `development.json` into a protected, Git-excluded directory. Do not substitute local credentials or include the file in reports.
