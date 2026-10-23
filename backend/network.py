@@ -70,20 +70,23 @@ class SafeNetworkBackend(httpcore2.AsyncNetworkBackend):
         hostname = host.decode() if isinstance(host, bytes) else host
         hostname = hostname.lower().rstrip(".")
         loop = asyncio.get_running_loop()
-        records = await asyncio.wait_for(
-            loop.getaddrinfo(hostname, port, type=socket.SOCK_STREAM), timeout or 5
-        )
-        addresses = list(dict.fromkeys(record[4][0] for record in records))
-        if not addresses:
-            raise httpcore2.ConnectError("MCP hostname did not resolve")
-        if hostname not in self.internal_hosts and any(
-            not ipaddress.ip_address(address).is_global for address in addresses
-        ):
-            raise httpcore2.ConnectError("MCP destination resolved to a forbidden address")
-        # Connect only to validated numeric addresses, preserving the original TLS SNI.
-        # A host may publish IPv6 even when this installation only has an IPv4 route.
         try:
+            # DNS and address fallback share one budget. Starting a fresh timeout
+            # after DNS can otherwise nearly double the configured connect limit.
             async with asyncio.timeout(timeout if timeout is not None else 5):
+                try:
+                    records = await loop.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+                except OSError:
+                    raise httpcore2.ConnectError("MCP hostname did not resolve") from None
+                addresses = list(dict.fromkeys(record[4][0] for record in records))
+                if not addresses:
+                    raise httpcore2.ConnectError("MCP hostname did not resolve")
+                if hostname not in self.internal_hosts and any(
+                    not ipaddress.ip_address(address).is_global for address in addresses
+                ):
+                    raise httpcore2.ConnectError("MCP destination resolved to a forbidden address")
+                # Connect only to validated numeric addresses, preserving TLS SNI.
+                # IPv6 may be advertised even when this host only has an IPv4 route.
                 for index, address in enumerate(addresses):
                     try:
                         return await self.backend.connect_tcp(

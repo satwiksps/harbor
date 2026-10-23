@@ -41,6 +41,22 @@ def tool_error(message: str):
     )
 
 
+class UpstreamClient(Client):
+    async def call_tool(self, name, arguments):
+        # Client.call_tool validates arbitrary output schemas on the event loop
+        # and may re-list/retry a call. Keep one dispatch and validate the pinned
+        # schema in the gateway's killable worker instead.
+        result = await self.session.send_request(
+            types.CallToolRequest(
+                params=types.CallToolRequestParams(name=name, arguments=arguments)
+            ),
+            types.CallToolResult,
+        )
+        if result.result_type != "complete":
+            raise ValueError("Upstream requested an unsupported tool continuation")
+        return result
+
+
 class Gateway:
     def __init__(self, db, settings, credentials):
         self.db, self.settings, self.credentials = db, settings, credentials
@@ -102,7 +118,7 @@ class Gateway:
             transport=SafeTransport(self.settings.internal_hosts),
             trust_env=False,
         ) as http:
-            async with Client(
+            async with UpstreamClient(
                 streamable_http_client(upstream.url, http_client=http),
                 cache=None,
                 read_timeout_seconds=self.settings.tool_timeout_seconds,
@@ -273,10 +289,23 @@ class Gateway:
                             return tool_error(error)
                         write_dispatched = current_upstream.permissions.get(tool["name"]) != "read"
                         result = await client.call_tool(tool["name"], arguments)
-            encoded = result.model_dump_json(by_alias=True)
-            if len(encoded.encode()) > 256 * 1024:
-                error = failure("Tool result exceeded the 256 KiB gateway limit.")
-                return tool_error(error)
+                    encoded = result.model_dump_json(by_alias=True)
+                    if len(encoded.encode()) > 256 * 1024:
+                        error = failure("Tool result exceeded the 256 KiB gateway limit.")
+                        return tool_error(error)
+                    if not result.is_error and tool.get("outputSchema") is not None:
+                        try:
+                            if (
+                                result.structured_content is None
+                                and "structured_content" not in result.model_fields_set
+                            ):
+                                raise ValueError("Missing structured result")
+                            await self.schema_checks.validate(
+                                tool["outputSchema"], result.structured_content
+                            )
+                        except (jsonschema.ValidationError, jsonschema.SchemaError, ValueError):
+                            error = failure("Upstream result does not match its declared schema.")
+                            return tool_error(error)
             result = types.CallToolResult.model_validate(
                 redact_credential(json.loads(encoded), credential)
             )
