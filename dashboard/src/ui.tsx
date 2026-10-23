@@ -189,11 +189,26 @@ export function Modal({
   busy?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const trigger = useRef(
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
   const id = useId();
   useEffect(() => {
     const node = ref.current;
     node?.showModal();
-    return () => node?.close();
+    return () => {
+      node?.close();
+      queueMicrotask(() => {
+        // React may remove the dialog before native focus restoration runs.
+        // Preserve a subsequent dialog or a caller's intentional focus change.
+        if (
+          trigger.current?.isConnected &&
+          document.activeElement === document.body &&
+          !document.querySelector("dialog[open]")
+        )
+          trigger.current.focus({ preventScroll: true });
+      });
+    };
   }, []);
   return (
     <dialog

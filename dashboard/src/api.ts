@@ -137,13 +137,26 @@ export function setCsrf(value: string) {
   if (csrf !== value) sessionVersion++;
   csrf = value;
 }
+export function getSessionVersion() {
+  return sessionVersion;
+}
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public retryAfterSeconds?: number,
   ) {
     super(message);
   }
+}
+function retryAfterSeconds(value: string | null) {
+  if (!value) return undefined;
+  const seconds = /^\d+(?:\.\d+)?$/.test(value.trim())
+    ? Number(value)
+    : (Date.parse(value) - Date.now()) / 1000;
+  return Number.isFinite(seconds)
+    ? Math.min(86400, Math.max(0, Math.ceil(seconds)))
+    : undefined;
 }
 export async function api<T>(
   path: string,
@@ -184,11 +197,21 @@ export async function api<T>(
       requestSession === sessionVersion
     )
       window.dispatchEvent(new Event("session-expired"));
-    throw new ApiError(detail, response.status);
+    throw new ApiError(
+      detail,
+      response.status,
+      retryAfterSeconds(response.headers.get("Retry-After")),
+    );
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      "The workspace returned an unreadable response. Please try again.",
+    );
+  }
 }
 export function errorMessage(error: unknown) {
   if (error instanceof DOMException && error.name === "TimeoutError")

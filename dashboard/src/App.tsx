@@ -16,7 +16,14 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { api, ApiError, errorMessage, healthy, setCsrf } from "./api";
+import {
+  api,
+  ApiError,
+  errorMessage,
+  getSessionVersion,
+  healthy,
+  setCsrf,
+} from "./api";
 import type { AuthResponse, Health, Role, Server, User } from "./api";
 import { Badge, ErrorBox, Logo, Spinner, Toast, useResource } from "./ui";
 import { Chat } from "./Chat";
@@ -43,6 +50,29 @@ function currentPage(): Page {
   const hash = location.hash.slice(1);
   return nav.some((n) => n.id === hash) ? (hash as Page) : "chat";
 }
+function authResponse(value: unknown): AuthResponse {
+  if (value && typeof value === "object") {
+    const response = value as Partial<AuthResponse>;
+    const user = response.user;
+    if (
+      typeof response.csrf_token === "string" &&
+      response.csrf_token &&
+      user &&
+      typeof user === "object" &&
+      ((typeof user.id === "string" && user.id) ||
+        (typeof user.id === "number" && Number.isFinite(user.id))) &&
+      typeof user.name === "string" &&
+      user.name.trim() &&
+      typeof user.email === "string" &&
+      user.email &&
+      (user.role === "admin" || user.role === "member")
+    )
+      return response as AuthResponse;
+  }
+  throw new Error(
+    "The workspace returned an invalid sign-in response. Please try again.",
+  );
+}
 
 export function App() {
   const [auth, setAuth] = useState<AuthResponse | null>();
@@ -54,8 +84,14 @@ export function App() {
   } | null>(null);
   const [mobile, setMobile] = useState(false);
   const authRequest = useRef(0);
+  const currentSession = getSessionVersion();
   const closeToast = useCallback(() => setToast(null), []);
-  const notify = useCallback((message: string) => setToast({ message }), []);
+  const notify = useCallback(
+    (message: string) => {
+      if (currentSession === getSessionVersion()) setToast({ message });
+    },
+    [currentSession],
+  );
   const acceptToken =
     new URLSearchParams(location.search).get("token") ??
     (location.pathname.startsWith("/invite/")
@@ -67,7 +103,7 @@ export function App() {
     const request = ++authRequest.current;
     setAuthError("");
     try {
-      const response = await api<AuthResponse>("/auth/me");
+      const response = authResponse(await api<unknown>("/auth/me"));
       if (request !== authRequest.current) return;
       setCsrf(response.csrf_token);
       setAuth(response);
@@ -153,6 +189,7 @@ export function App() {
     return (
       <Login
         error={authError}
+        retryAuth={loadAuth}
         switchingAccount={isSignIn}
         onLogin={enterWorkspace}
       />
@@ -169,14 +206,22 @@ export function App() {
       notify={notify}
       onLogout={async () => {
         try {
-          await api("/auth/logout", { method: "POST" });
+          try {
+            await api("/auth/logout", { method: "POST" });
+          } catch (e) {
+            // An expired cookie is already signed out on the server.
+            if (!(e instanceof ApiError && e.status === 401)) throw e;
+          }
+          if (currentSession !== getSessionVersion()) return;
           authRequest.current++;
           setCsrf("");
           setAuth(null);
+          setAuthError("");
           setToast(null);
           announceSessionChange();
         } catch (e) {
-          setToast({ message: errorMessage(e), error: true });
+          if (currentSession === getSessionVersion())
+            setToast({ message: errorMessage(e), error: true });
         }
       }}
     >
@@ -205,13 +250,15 @@ function Workspace({
   mobile: boolean;
   setMobile: (v: boolean) => void;
   notify: (v: string) => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
   children: React.ReactNode;
 }) {
   const health = useResource<Health>("/health");
   const servers = useResource<Server[]>("/servers");
   const sidebar = useRef<HTMLElement>(null);
   const navigationTrigger = useRef<HTMLButtonElement>(null);
+  const signingOut = useRef(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   useEffect(() => {
     if (!mobile) return;
     const desktop = window.matchMedia("(min-width: 761px)");
@@ -363,7 +410,18 @@ function Workspace({
             </span>
             <button
               className="icon-button"
-              onClick={onLogout}
+              onClick={async () => {
+                if (signingOut.current) return;
+                signingOut.current = true;
+                setLogoutBusy(true);
+                try {
+                  await onLogout();
+                } finally {
+                  signingOut.current = false;
+                  setLogoutBusy(false);
+                }
+              }}
+              disabled={logoutBusy}
               title={`Sign out of ${user.email}`}
               aria-label="Sign out"
             >
@@ -517,10 +575,12 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
 
 function Login({
   error: initialError,
+  retryAuth,
   switchingAccount = false,
   onLogin,
 }: {
   error: string;
+  retryAuth: () => Promise<void>;
   switchingAccount?: boolean;
   onLogin: (auth: AuthResponse) => void;
 }) {
@@ -535,10 +595,12 @@ function Login({
     setError("");
     try {
       onLogin(
-        await api<AuthResponse>("/auth/login", {
-          method: "POST",
-          body: { email, password },
-        }),
+        authResponse(
+          await api<unknown>("/auth/login", {
+            method: "POST",
+            body: { email, password },
+          }),
+        ),
       );
     } catch (e) {
       setError(errorMessage(e));
@@ -560,7 +622,10 @@ function Login({
             : "Sign in to your Harbor workspace."}
         </p>
         {(error || initialError) && (
-          <ErrorBox message={error || initialError} />
+          <ErrorBox
+            message={error || initialError}
+            retry={!error && !busy ? retryAuth : undefined}
+          />
         )}
         <label>
           Email address
@@ -622,10 +687,12 @@ function InviteAcceptance({
     setBusy(true);
     setError("");
     try {
-      const response = await api<AuthResponse>("/auth/accept-invite", {
-        method: "POST",
-        body: { token, name: name.trim(), password },
-      });
+      const response = authResponse(
+        await api<unknown>("/auth/accept-invite", {
+          method: "POST",
+          body: { token, name: name.trim(), password },
+        }),
+      );
       setPassword("");
       onAccepted(response);
     } catch (e) {
@@ -643,7 +710,9 @@ function InviteAcceptance({
         <p className="eyebrow">TEAM INVITATION</p>
         <h2>Join your workspace.</h2>
         {invite.loading && <Spinner label="Checking invitation" />}
-        {invite.error && <ErrorBox message={invite.error} />}{" "}
+        {invite.error && (
+          <ErrorBox message={invite.error} retry={invite.refresh} />
+        )}{" "}
         {invite.data && (
           <>
             <p className="muted">
