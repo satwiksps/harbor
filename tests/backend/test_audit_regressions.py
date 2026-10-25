@@ -260,8 +260,9 @@ async def test_failed_handshake_does_not_claim_write_was_dispatched(environment,
     assert "may have completed" not in result.content[0].text
 
 
+@pytest.mark.parametrize("call_id", ["external-read", None])
 async def test_external_agent_refuses_tool_reclassified_while_model_thinks(
-    environment, monkeypatch
+    environment, monkeypatch, call_id
 ):
     app, http = environment
     upstream_id = seed_upstream(app)
@@ -305,9 +306,14 @@ async def test_external_agent_refuses_tool_reclassified_while_model_thinks(
                 with app.state.db.session() as session:
                     session.get(Upstream, upstream_id).permissions = {"create_product": "write"}
                 parts = [
-                    genai_types.Part.from_function_call(name=name, args={"name": "Unexpected"})
+                    genai_types.Part(function_call=genai_types.FunctionCall(
+                        id=call_id, name=name, args={"name": "Unexpected"}
+                    ))
                 ]
             else:
+                reply = kwargs["contents"][-1].parts[0].function_response
+                assert reply.id == call_id
+                assert reply.name == name
                 parts = [genai_types.Part(text="The gateway rejected the changed tool.")]
             return genai_types.GenerateContentResponse(
                 candidates=[

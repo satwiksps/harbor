@@ -65,6 +65,13 @@ def provider_retry_delay(exc):
     return min(max(delays) if delays else 60, 86400)
 
 
+def function_response_part(function, response):
+    # The SDK convenience constructor does not accept the provider's call ID.
+    return genai_types.Part(function_response=genai_types.FunctionResponse(
+        id=function.id, name=function.name, response=response
+    ))
+
+
 def confirmed_message(name, result):
     if result["is_error"]:
         return "The change could not be completed. Open the tool result for details."
@@ -263,9 +270,7 @@ class ChatAgent:
                                 discovery = catalog.search(
                                     self.gateway.catalog_for(principal), arguments
                                 )
-                                replies.append(genai_types.Part.from_function_response(
-                                    name=SEARCH_NAME, response=discovery
-                                ))
+                                replies.append(function_response_part(function, discovery))
                                 continue
                             selected = declared.get(function.name)
                             upstream, tool = self.gateway.lookup(function.name)
@@ -275,9 +280,8 @@ class ChatAgent:
                                 or selected.target_hash != target_hash(upstream, tool)
                             ):
                                 catalog.active.pop(function.name, None)
-                                replies.append(genai_types.Part.from_function_response(
-                                    name=function.name,
-                                    response={"error": (
+                                replies.append(function_response_part(
+                                    function, {"error": (
                                         "Tool was not selected, changed, or is no longer permitted. "
                                         "Search again if discovery is available; otherwise start a new request."
                                     )},
@@ -291,9 +295,8 @@ class ChatAgent:
                                         tool["inputSchema"], arguments
                                     )
                                 except (ValueError, jsonschema.ValidationError, jsonschema.SchemaError):
-                                    replies.append(genai_types.Part.from_function_response(
-                                        name=function.name,
-                                        response={"error": (
+                                    replies.append(function_response_part(
+                                        function, {"error": (
                                             "Tool arguments did not match its schema. "
                                             "Correct the arguments and try again."
                                         )},
@@ -338,9 +341,7 @@ class ChatAgent:
                                 }
                             )
                             replies.append(
-                                genai_types.Part.from_function_response(
-                                    name=function.name, response={"result": tool_result}
-                                )
+                                function_response_part(function, {"result": tool_result})
                             )
                         contents.append(genai_types.Content(role="user", parts=replies))
             raise HTTPException(422, "The model reached the tool loop limit. Narrow the request.")
@@ -348,6 +349,14 @@ class ChatAgent:
             raise
         except (TimeoutError, httpx.TimeoutException, httpx2.TimeoutException) as exc:
             logger.warning("Chat request failed: exception=%s status=504", type(exc).__name__)
+            if calls:
+                return {
+                    "message": (
+                        "The AI response timed out. Available tool results are shown below; "
+                        "this answer may be incomplete."
+                    ),
+                    "tool_calls": calls,
+                }
             raise HTTPException(
                 504, "Chat timed out. Check the audit log before retrying a write."
             ) from None
@@ -369,6 +378,14 @@ class ChatAgent:
                     503, "The chat provider is temporarily unavailable. Please try again shortly."
                 ) from None
             if status in {408, 504}:
+                if calls:
+                    return {
+                        "message": (
+                            "The AI response timed out. Available tool results are shown below; "
+                            "this answer may be incomplete."
+                        ),
+                        "tool_calls": calls,
+                    }
                 raise HTTPException(
                     504, "The chat provider timed out. Check the audit log before retrying a write."
                 ) from None

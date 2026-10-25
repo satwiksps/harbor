@@ -141,6 +141,46 @@ async def test_provider_retry_does_not_replay_a_completed_tool_read(
     assert requests[1]["contents"][-1]["parts"][0]["functionResponse"]["name"] == name
 
 
+@pytest.mark.parametrize("call_ids", [("read-first", "read-second"), (None, None)])
+async def test_parallel_read_results_preserve_provider_call_ids(
+    environment, provider_wire, monkeypatch, call_ids
+):
+    app, http = environment
+    seed_upstream(app)
+    name = tool_alias("woo", "list_orders")
+    parts = [
+        {"functionCall": {"name": name, "args": {}, **({"id": call_id} if call_id else {})}}
+        for call_id in call_ids
+    ]
+    parts[0]["thoughtSignature"] = "b3JpZ2luYWwtc2lnbmF0dXJl"
+    requests = provider_wire([answer(parts), answer([{"text": "Both reads completed."}])])
+    read = AsyncMock(side_effect=[
+        {
+            "name": name, "arguments": {}, "is_error": False,
+            "result": {"structuredContent": {"read": number}}, "duration_ms": 1,
+        }
+        for number in (1, 2)
+    ])
+    monkeypatch.setattr(app.state.agent, "call_gateway", read)
+
+    response = await ask(http)
+
+    assert response.status_code == 200
+    assert read.await_count == 2
+    assert len(requests) == 2
+    assert requests[1]["contents"][-2]["parts"] == parts
+    replies = requests[1]["contents"][-1]["parts"]
+    assert len(replies) == 2
+    for number, (part, call_id) in enumerate(zip(replies, call_ids), start=1):
+        reply = part["functionResponse"]
+        assert reply["name"] == name
+        assert reply["response"]["result"]["structuredContent"]["read"] == number
+        if call_id:
+            assert reply["id"] == call_id
+        else:
+            assert "id" not in reply
+
+
 async def test_gateway_failure_is_not_retried(environment, provider_wire, monkeypatch):
     app, http = environment
     seed_upstream(app)
@@ -308,7 +348,9 @@ async def test_invalid_write_arguments_are_corrected_before_confirmation(
     seed_upstream(app)
     name = tool_alias("woo", "create_product")
     requests = provider_wire([
-        answer([{"functionCall": {"name": name, "args": {"name": 42}}}]),
+        answer([{"functionCall": {
+            "id": "invalid-write", "name": name, "args": {"name": 42}
+        }}]),
         answer([{"functionCall": {"name": name, "args": {"name": "Valid product"}}}]),
     ])
     dispatch = AsyncMock()
@@ -320,6 +362,7 @@ async def test_invalid_write_arguments_are_corrected_before_confirmation(
     assert len(requests) == 2
     feedback = requests[1]["contents"][-1]["parts"][0]["functionResponse"]["response"]
     assert feedback["error"].startswith("Tool arguments did not match its schema.")
+    assert requests[1]["contents"][-1]["parts"][0]["functionResponse"]["id"] == "invalid-write"
     with app.state.db.session() as session:
         pending = list(session.scalars(select(Confirmation)))
         assert len(pending) == 1

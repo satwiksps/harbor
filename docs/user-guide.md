@@ -56,6 +56,8 @@ If Gemini returns a quota error, chat keeps your message available to retry and 
 
 Chat accepts three simultaneous requests per gateway process. If all slots are occupied, it asks you to retry shortly instead of leaving another request waiting. Writes are never automatically repeated after a provider or connection failure.
 
+If the AI response times out after a tool returns data, chat keeps those tool results and marks the answer as incomplete. Open the result to inspect the retrieved data. If no tool has returned yet, chat shows a timeout error instead.
+
 ## Use the sample store
 
 1. Open the storefront from the console's **Open store** link. Browse the catalog or a product page and choose **Add to cart**.

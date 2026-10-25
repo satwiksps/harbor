@@ -183,9 +183,9 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
                                     "error": "Result too large. Request a smaller page or narrower filter."
                                 }
                             replies.append(
-                                types.Part.from_function_response(
-                                    name=function.name, response={"result": value}
-                                )
+                                types.Part(function_response=types.FunctionResponse(
+                                    id=function.id, name=function.name, response={"result": value}
+                                ))
                             )
                         conversation.append(types.Content(role="user", parts=replies))
     raise RuntimeError("Agent turn limit reached")
