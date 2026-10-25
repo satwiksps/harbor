@@ -146,7 +146,9 @@ Send `POST /api/chat/confirm` with `{id, approve}` to approve or cancel a propos
 
 Responses are not streamed. Missing Gemini configuration produces a `503` error. Chat history is supplied by the browser on each request, not stored as a server-side conversation.
 
-Provider quota errors return `429` with `Retry-After` in seconds. The gateway shares that cooldown across chat users in its process, using a structured provider hint or a 60-second fallback, capped at 24 hours. It checks the cooldown before each model request and does not automatically retry `429`. The guard is neither a distributed quota counter nor a guarantee that provider quota will be available afterward. At most three chat requests run concurrently; excess requests receive `503` with `Retry-After: 1`. Provider timeouts return `504`; empty, incomplete or blocked answers return `502` without executing their proposed tools.
+Provider quota errors return `429` with `Retry-After` in seconds. The gateway shares that cooldown across chat users in its process, using a structured provider hint or a 60-second fallback, capped at 24 hours. It checks the cooldown before each model request and does not automatically retry `429`. The guard is neither a distributed quota counter nor a guarantee that provider quota will be available afterward. At most three chat requests run concurrently; excess requests receive `503` with `Retry-After: 1`.
+
+Provider timeouts return `504` if no tool result is available. If a read has already returned a result, a later provider or overall chat timeout returns `200` with the available `tool_calls` and a message explicitly marking the answer as incomplete. It does not repeat tool calls. Empty, incomplete or blocked model responses return `502` without executing their proposed tools.
 
 ## Request limits
 
