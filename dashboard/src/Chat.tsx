@@ -339,15 +339,7 @@ export function Chat({
     <div className="chat-layout">
       <div className="chat-workspace">
         <div className="chat-heading">
-          <div>
-            <p className="eyebrow">WORKSPACE CHAT</p>
-            <h1>Your Harbor assistant.</h1>
-            <p className="chat-heading-description">
-              {user.role === "admin"
-                ? "Query your store and review proposed changes."
-                : "Find answers with your team's connected tools."}
-            </p>
-          </div>
+          <h1>Your Harbor assistant.</h1>
           <button
             className="button secondary small"
             disabled={messages.length === 0 || busy || !!confirmation}
@@ -614,10 +606,10 @@ export function Chat({
               onChange={(e) => setInput(e.target.value)}
               placeholder={
                 confirmation
-                  ? "Review the pending action to continue"
-                  : "Ask about products, orders, policies, or shipping..."
+                  ? "Review the pending action"
+                  : "Ask about your store..."
               }
-              rows={2}
+              rows={1}
               aria-describedby="chat-composer-hint"
               maxLength={12000}
               disabled={
@@ -634,26 +626,20 @@ export function Chat({
                 }
               }}
             />
-            <div className="composer-footer">
-              <span>
-                <ShieldCheck size={14} />
-                Your permissions. Every action logged.
-              </span>
-              <button
-                className="send-button"
-                type="submit"
-                disabled={
-                  !input.trim() ||
-                  busy ||
-                  !!confirmation ||
-                  retryRemaining > 0 ||
-                  health?.chat_configured === false
-                }
-                aria-label="Send message"
-              >
-                <ArrowUp size={19} />
-              </button>
-            </div>
+            <button
+              className="send-button"
+              type="submit"
+              disabled={
+                !input.trim() ||
+                busy ||
+                !!confirmation ||
+                retryRemaining > 0 ||
+                health?.chat_configured === false
+              }
+              aria-label="Send message"
+            >
+              <ArrowUp size={19} />
+            </button>
           </form>
           <div className="composer-note" id="chat-composer-hint">
             <span>
