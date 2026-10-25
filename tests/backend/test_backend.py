@@ -1077,6 +1077,7 @@ async def test_chat_provider_errors_are_bounded_and_redacted(
     assert response.status_code == expected
     assert captured["http_options"].timeout == 45000
     assert captured["http_options"].retry_options.attempts == 1
+    assert captured["config"].temperature == 1.0
     assert captured["config"].thinking_config.thinking_level.value == "LOW"
     assert "ProviderError" in caplog.text
     assert "private-provider-key" not in caplog.text + response.text

@@ -124,7 +124,8 @@ async def ask(prompt, gateway_url, gateway_key, provider_key, model="gemini-3.1-
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                     thinking_config=types.ThinkingConfig(thinking_level="low"),
                     max_output_tokens=2048,
-                    temperature=0.1,
+                    # Gemini 3 recommends 1.0; lower temperatures can cause generation loops.
+                    temperature=1.0,
                 )
                 conversation = [types.Content(role="user", parts=[types.Part(text=prompt)])]
                 async with genai.Client(

@@ -178,7 +178,8 @@ class ChatAgent:
                 f"Current UTC timestamp: {now().isoformat()}Z. User role: {principal.role}."
             ),
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-            temperature=0.1,
+            # Gemini 3 recommends 1.0; lower temperatures can cause generation loops.
+            temperature=1.0,
             max_output_tokens=2048,
             thinking_config=genai_types.ThinkingConfig(thinking_level="low"),
         )
