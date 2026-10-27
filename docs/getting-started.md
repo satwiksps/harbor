@@ -2,7 +2,7 @@
 
 Run the complete Harbor system on a Windows machine with Docker Desktop. Commands below run in PowerShell 7 from the repository root. For a Linux server deployment, use [Deployment and recovery](operations.md#vps-configuration).
 
-You will get a local console, a sample WooCommerce store and one MCP endpoint. You need access to the private application repository. If you already have an account on a running Harbor instance, go straight to [Using the console](user-guide.md).
+You will get a local console, a sample WooCommerce store and one MCP endpoint. Clone the [Harbor repository](https://github.com/satwiksps/harbor) to get started. If you already have an account on a running Harbor instance, go straight to [Using the console](user-guide.md).
 
 ## Prerequisites
 

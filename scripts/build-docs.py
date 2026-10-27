@@ -1,4 +1,4 @@
-"""Build only reviewed public documentation from the private application repository."""
+"""Build only reviewed public documentation from the application repository."""
 
 from __future__ import annotations
 

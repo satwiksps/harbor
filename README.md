@@ -36,7 +36,7 @@
 
 ## Run locally
 
-Clone this private repository, then open PowerShell at its root. [Prerequisites](https://docs.harbor.satwiksps.site/getting-started/#prerequisites): PowerShell 7, Docker Desktop with Linux containers and 8 GB allocated, Git, kubectl, Python 3.12 and uv.
+Clone this repository, then open PowerShell at its root. [Prerequisites](https://docs.harbor.satwiksps.site/getting-started/#prerequisites): PowerShell 7, Docker Desktop with Linux containers and 8 GB allocated, Git, kubectl, Python 3.12 and uv.
 
 ```powershell
 uv sync --frozen
