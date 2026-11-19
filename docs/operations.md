@@ -91,15 +91,26 @@ Use a dedicated Linux VM with enough capacity for the workloads in `deploy/chart
 
 The commands below use Ubuntu, x86-64, K3s `v1.35.5+k3s1`, Helm `4.3.1` and cert-manager `v1.21.2`. Use images and installer archives matching your host architecture.
 
+### Public demonstration host
+
+The [public console](https://harbor.satwiksps.site/) and [store](https://store.harbor.satwiksps.site/) run on one AWS EC2 instance in `ap-south-1`, set up with the procedure below: `t3a.medium` (2 vCPU, 4 GiB, x86-64), Ubuntu 24.04, a 30 GiB gp3 root volume and a 2 GiB swap file for image builds. The instance uses the Standard CPU credit mode, so sustained load is throttled instead of billed as surplus credits. An Elastic IP keeps the address fixed across stop and start. The security group allows TCP 80/443 from the internet and TCP 22 from the operator's address only.
+
+The host is funded by promotional credits. An AWS Budgets action stops the instance if charges appear beyond them; that takes the demo offline, and the volume and Elastic IP keep accruing charges until they are deleted.
+
 ### Prepare the public host
 
 Use one VM and its existing public address, without an external cloud load balancer. In the cloud firewall allow TCP 80/443 from the internet and TCP 22 only from the operator's current public IP. Keep 6443, database ports and upstream ports closed to the internet. SSH provides the administration path. Inspect the host firewall too. Preserve the cloud image's storage, metadata and management rules while permitting web traffic and K3s pod forwarding; do not replace the ruleset blindly.
 
 Create DNS records for separate console and store hosts, such as `console.example.com` and `store.example.com`, pointing to the VM. Confirm both names resolve before requesting a certificate. Documentation is a separate static site and does not need an ingress route in this cluster. Preserve any unrelated DNS records.
 
-A future VM move can retain the same application names by updating their A records after restoring and testing the destination. Changing the application hostname also requires updating ingress hosts, public URLs and WordPress's stored URLs before checking redirects, sign-in, invitations, checkout and external clients.
+To move to another VM while keeping the same names, follow [Move to a new host](#move-to-a-new-host). Changing the application hostname also requires updating ingress hosts, public URLs and WordPress's stored URLs before checking redirects, sign-in, invitations, checkout and external clients.
 
-On a fresh Ubuntu VM, install Docker only as an image builder, plus Python 3, curl and CA certificates. Keep k3s on its own containerd runtime. Docker can change the host's FORWARD policy, so inspect the resulting rules and verify external HTTP traffic after installation. Do not expose the Docker API.
+On a fresh Ubuntu VM, install Docker only as an image builder, plus Python 3, curl and CA certificates. The dashboard Dockerfile uses `COPY --chmod`, which requires BuildKit; Ubuntu's `docker.io` package provides it only with `docker-buildx` installed. Keep k3s on its own containerd runtime. Docker can change the host's FORWARD policy, so inspect the resulting rules and verify external HTTP traffic after installation. Do not expose the Docker API.
+
+```sh
+sudo apt-get install -y docker.io docker-buildx python3 curl ca-certificates
+docker buildx version
+```
 
 Download and review the pinned k3s installer, then install with Secret encryption:
 
@@ -156,6 +167,36 @@ The VPS helper operates only on `/etc/rancher/k3s/k3s.yaml`, requires one ready 
 On later releases, use the existing console and store hostnames. The helper preserves their current TLS configuration, including certificates retained for old-address redirects. It rejects hostname or service-role changes before touching credentials or cluster resources. A domain change requires a controlled migration: configure DNS, issue the new certificate, update the application and stored storefront URLs together, and verify redirects and authentication before publishing the new links.
 
 `deploy/vps/traefik.yaml` changes the cluster's ingress controller, so use it only on the dedicated Harbor node. `deploy/vps/tls.yaml` creates a namespace-scoped issuer. Neither file creates billable cloud infrastructure. For a different ingress controller, an existing certificate, or a different namespace, use the manual configuration below.
+
+### Move to a new host
+
+Deploy and test the replacement before changing DNS, so the current host keeps serving until the switch.
+
+1. Lower the TTL of both A records, for example to one minute, and wait for the previous TTL to pass.
+2. Prepare the new VM as above and build and import the same release. To keep existing data, copy the backup's `development.json` and `gemini-api-key.txt` into `.secrets` before deploying, then import the databases and content as described in [Restore data](#restore-data) before testing. Without them the helper generates new credentials and an empty installation.
+3. Deploy without waiting for certificates. Pass the variable after `sudo`, which otherwise drops it:
+
+    ```sh
+    sudo HARBOR_DEFER_CERTIFICATES=1 bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL "$tag"
+    ```
+
+4. Test the new host by address while DNS still points at the old one. `--resolve` sends the real hostname; `-k` is needed until the certificate exists. Check sign-in and the store the same way, or with a temporary hosts-file entry on the test machine.
+
+    ```sh
+    curl -k --resolve CONSOLE_HOST:443:NEW_IP https://CONSOLE_HOST/api/health
+    curl -k --resolve STORE_HOST:443:NEW_IP -o /dev/null -w '%{http_code}\n' https://STORE_HOST/
+    ```
+
+5. Point both A records at the new address and confirm the domain's authoritative nameservers return it, for example with `dig +short CONSOLE_HOST @NAMESERVER`.
+6. Wait for the certificate, then repeat the checks without `--resolve` or `-k`. `harbor-ingress-tls` is the fresh-install name; `sudo kubectl -n harbor get certificate` lists the actual ones.
+
+    ```sh
+    sudo kubectl -n harbor wait --for=condition=Ready certificate/harbor-ingress-tls --timeout=600s
+    ```
+
+7. Keep the old host running until the old TTL has passed for all clients, then retire it.
+
+cert-manager fetches each HTTP-01 challenge URL itself before asking Let's Encrypt to validate it. A certificate left pending while DNS points elsewhere therefore does not count against Let's Encrypt's failed-validation limit. Visitors who reach the new host between the DNS change and issuance see a certificate warning; with a short TTL this usually lasts a minute or two.
 
 ### Manual deployment configuration
 
@@ -244,7 +285,7 @@ On the dedicated Linux VPS, use:
 sudo bash scripts/backup-vps.sh
 ```
 
-This creates a new mode-700 directory under `.secrets/backups`, keeps failed outputs marked `.partial`, removes server-generated Secret metadata for recovery, and records Helm values and checksums alongside the database/content backups. Copy the completed directory off the VM. This is an application backup, not a snapshot of the k3s control plane. A replacement node can generate a new cluster and issue a new TLS certificate before restoring the application data.
+This creates a new mode-700 directory under `.secrets/backups`, keeps failed outputs marked `.partial`, removes server-generated Secret metadata for recovery, and records Helm values and checksums alongside the database/content backups. Copy the completed directory off the VM. This is an application backup, not a snapshot of the k3s control plane. A replacement node runs a new cluster and receives the restored application data before DNS moves to it; see [Move to a new host](#move-to-a-new-host).
 
 ### Upgrade or roll back application configuration
 
