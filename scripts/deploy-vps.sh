@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Run on the single k3s VPS after importing the three versioned application images.
+# HARBOR_DEFER_CERTIFICATES=1 skips the final certificate wait, for a replacement host
+# that is deployed and tested before DNS points at it.
 set -euo pipefail
 umask 077
 
 if [[ $# -ne 4 || $EUID -ne 0 ]]; then
-  echo 'Usage: sudo bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL IMAGE_TAG' >&2
+  echo 'Usage: sudo [HARBOR_DEFER_CERTIFICATES=1] bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL IMAGE_TAG' >&2
+  exit 2
+fi
+defer_certificates=${HARBOR_DEFER_CERTIFICATES:-0}
+if [[ $defer_certificates != 0 && $defer_certificates != 1 ]]; then
+  echo 'HARBOR_DEFER_CERTIFICATES must be 0 or 1.' >&2
   exit 2
 fi
 console_host=$1
@@ -136,6 +143,14 @@ helm upgrade --install harbor deploy/chart -n harbor -f deploy/values-prod.yaml 
   --set-string "networkPolicy.apiServerCidr=$api_ip/32" --wait --timeout 15m
 kubectl -n harbor wait --for=condition=complete job/wordpress-bootstrap --timeout=600s
 certificates=$(python3 -c 'import json; print("\n".join(dict.fromkeys(item["secretName"] for item in json.load(open(".runtime/values-vps.json"))["ingress"]["tls"])))')
+if [[ $defer_certificates == 1 ]]; then
+  kubectl -n harbor get deployments,pvc
+  printf 'Deployed without waiting for certificates. Test this host by address, point DNS at it, then wait for:\n'
+  while IFS= read -r certificate; do
+    printf '  sudo kubectl -n harbor wait --for=condition=Ready certificate/%s --timeout=600s\n' "$certificate"
+  done <<< "$certificates"
+  exit 0
+fi
 while IFS= read -r certificate; do
   kubectl -n harbor wait --for=condition=Ready "certificate/$certificate" --timeout=600s
 done <<< "$certificates"
