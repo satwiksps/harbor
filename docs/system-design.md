@@ -17,6 +17,19 @@ Harbor connects one team to a WooCommerce store through a shared Model Context P
 
 Dependency lockfiles and container definitions record exact versions. See [development](development.md) for the source map and [deployment](operations.md) for runtime configuration.
 
+## Design decisions
+
+| Decision | Alternatives considered | Reason |
+| --- | --- | --- |
+| One FastAPI service for identity, registry, gateway, chat and audit | Separate management API and gateway services | One team and one replica do not need independent scaling. A single process shares the session check, permission check and audit code across the console API, `/mcp` and chat. A split would add an internal API with its own authentication. The modules (`backend/gateway.py`, `backend/chat.py`) are separable if that changes. |
+| WooCommerce REST API for the commerce upstream | WP-CLI; SQL against MariaDB | REST applies WooCommerce's own validation, hooks and stock rules, and works between pods with a scoped key. WP-CLI would need a shell in the WordPress pod for every call, through `pods/exec` rights or a sidecar. SQL would bypass WooCommerce's rules, and its schema is not a stable interface. WP-CLI is still used once, by the bootstrap Job. |
+| Public tool names `slug__name_hash` | Server prefix only; opaque IDs | A prefix alone can still collide after names are sanitized and shortened. An eight-character hash of the original name keeps aliases unique and stable, and the readable part helps people and models. Aliases stay within 60 characters. |
+| SHA-256 for API keys, Argon2 for passwords | Argon2 for both | Keys are 256-bit random values, so a fast hash is not guessable, and every MCP request must look one up. Argon2 costs 64 MiB per check and would sit on that path. Passwords are low-entropy, so they need a slow hash. |
+| Registered upstream credentials in one Kubernetes Secret, referenced by key from PostgreSQL | Encrypted column in PostgreSQL | Values stay out of database dumps and registry rows, K3s encrypts the Secret at rest, and RBAC limits the gateway to `get` and `patch` on that one Secret. The gateway can read every registered credential; for one team that is the intended boundary. |
+| Build images on the node and import them into k3s | Push to a container registry | A single node needs no registry to run or pay for, and images never leave the host. Builds use the node's CPU and memory, and a multi-node cluster would need a registry; the chart already accepts registry image references. |
+| K3s everywhere: k3d locally, k3s on the server | kind; Minikube | Traefik, local-path storage and the NetworkPolicy controller behave the same in both places, so Helm values are the only difference. |
+| Gemini for chat, kept optional | Other hosted providers; a local model | The free tier is enough for a demonstration, and the provider is confined to `backend/chat.py`. The gateway, keys and external clients work without any model key. |
+
 ## Components
 
 An upstream is a connected MCP service. The gateway is the shared entry point that authenticates clients, applies permissions and routes their calls.
