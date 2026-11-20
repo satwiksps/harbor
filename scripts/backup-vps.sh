@@ -38,4 +38,4 @@ for filename in development.json gemini-api-key.txt; do
   if [[ -f .secrets/$filename ]]; then cp ".secrets/$filename" "$backup/$filename"; fi
 done
 (cd "$backup" && sha256sum ./* > SHA256SUMS)
-printf 'Private application backup: %s\nCopy it off the VM before the trial ends.\n' "$backup"
+printf 'Private application backup: %s\nCopy it off the VM; a backup stored only on this node is lost with it.\n' "$backup"

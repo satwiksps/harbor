@@ -51,6 +51,8 @@ pwsh -File scripts/bootstrap.ps1
 2. [Build and import a release](https://docs.harbor.satwiksps.site/operations/#deploy-a-reviewed-release), then run `sudo bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL TAG`. The helper generates fresh production credentials on first installation.
 3. Review [production values](https://docs.harbor.satwiksps.site/operations/#manual-deployment-configuration): DNS, TLS ingress, storage class/sizes and existing Secrets. [Verify the deployment](https://docs.harbor.satwiksps.site/development/#testing-a-public-deployment) and configure [backups](https://docs.harbor.satwiksps.site/operations/#create-a-backup).
 
+To replace the VM without downtime, deploy and test the new host before changing DNS; see [Move to a new host](https://docs.harbor.satwiksps.site/operations/#move-to-a-new-host).
+
 ## Use Harbor
 
 - **[Place an order](https://docs.harbor.satwiksps.site/user-guide/#use-the-sample-store):** add a product to the cart, review quantities and checkout with fictional details and an Indian address. Choose Cash on delivery. No payment or shipment occurs.
