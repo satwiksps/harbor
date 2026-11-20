@@ -114,6 +114,25 @@ Prices remain decimal strings and Python Decimal values. The sample store uses I
 
 Local k3d runs K3s with Traefik, local-path storage and an embedded NetworkPolicy controller. The same Helm chart accepts production hosts, TLS Secret references, storage class, sizes, image tags and resource settings. Production images can come from an accessible private registry or be built and imported directly on a single k3s node. The [VPS deployment procedure](operations.md#vps-configuration) uses the latter approach.
 
+Both environments install the same chart; only values change. Local values come from `deploy/values-local.yaml` plus `.runtime/values-runtime.yaml`, written by `scripts/deploy.ps1`. Production values come from `deploy/values-prod.yaml` plus `.runtime/values-vps.json`, written by `scripts/deploy-vps.sh`. Settings not listed use the chart defaults in both.
+
+| Setting | Local | Production |
+| --- | --- | --- |
+| Console and store hosts | `harbor.localhost`, `store.localhost` | DNS names passed to `deploy-vps.sh` |
+| Public URLs | `http://…:8080` | `https://…` |
+| Ingress TLS | None | `harbor-ingress-tls`, issued by cert-manager through the HTTP-01 issuer in `deploy/vps/tls.yaml` |
+| ACME solver NetworkPolicy | Off | On (`networkPolicy.allowAcmeHttp01`) |
+| Ingress controller | k3d's Traefik, published on `127.0.0.1:8080/8443` | Traefik with `externalTrafficPolicy: Local` and an HTTP-to-HTTPS redirect (`deploy/vps/traefik.yaml`) |
+| Session cookies | `gateway.secureCookies: false` | `true` |
+| Images | `:dev` tags, rebuilt by `bootstrap.ps1` | An immutable release tag, built on the node and imported into k3s |
+| Volumes (WordPress, MariaDB, PostgreSQL) | `local-path`, 2/2/1 GiB | `local-path`, 10/10/5 GiB |
+| Proxy trust | The node's pod CIDRs, discovered at deploy time | The node's pod CIDRs, discovered at deploy time |
+| API-server egress | The chart's default Service IP (`10.43.0.1/32`) and the node's internal IP, discovered at deploy time | The Kubernetes Service IP and the node's internal IP, both discovered at deploy time |
+| Credentials | `.secrets/development.json`, created by `bootstrap.ps1` | `.secrets/development.json` on the host, created by `prepare-secrets.py` |
+| Administrator email | From the local credential file | The `ADMIN_EMAIL` argument |
+
+Secret names, probes, resource limits and the remaining NetworkPolicies are the same in both environments.
+
 Each component runs one replica. PostgreSQL and MariaDB have no high-availability configuration, local-path volumes stay on one node, rate limits are process-local, and the gateway is not horizontally scaled. Moving to multiple nodes requires changes to storage, session handling and rate limiting before increasing replicas.
 
 Upgrades use versioned images and Helm. Application rollback is distinct from database rollback. Back up the databases and WordPress content before an incompatible migration. Do not assume `helm rollback` restores persistent data.
