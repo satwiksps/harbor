@@ -2,7 +2,7 @@
 
 Harbor gives a team one place to access its WooCommerce tools. Connect services once, choose which tools members can use, then work through the web console or an external MCP client. Each tool call runs under the caller's identity and appears in Activity.
 
-Use the [console](https://harbor.satwiksps.site/) with an invited account, browse the [sample store](https://store.harbor.satwiksps.site/), or [install Harbor locally](getting-started.md) with access to the source repository.
+Use the [console](https://harbor.satwiksps.site/) with an invited account, browse the [sample store](https://store.harbor.satwiksps.site/), or [install Harbor locally](getting-started.md) from the [source repository](https://github.com/satwiksps/harbor).
 
 ## How it works
 
@@ -45,4 +45,4 @@ Harbor supports one team, one WooCommerce store and one gateway replica. Tool ac
 
 The sample storefront does not process payments, send email or book shipments. Its shipping quotes use a local rate table. Use fictional customer details when placing sample orders. A single-node deployment with local storage does not provide high availability.
 
-These docs describe the application and its operation. The source repository is private, so source access is required to install or modify Harbor.
+These docs describe the application and its operation. The source code, Helm chart and tests are in the [GitHub repository](https://github.com/satwiksps/harbor), under the Apache License 2.0.

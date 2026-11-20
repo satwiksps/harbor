@@ -73,7 +73,7 @@ After disabling a connection or changing permissions, refresh the catalog or rec
 
 ## Ask a question with the reference agent
 
-The reference agent requires source access. The repository includes `examples/ask_gateway.py`, a standalone client using the official MCP and Google Gen AI SDKs. It discovers tools over HTTP without importing Harbor's backend. The model can use only those tools, with no shell, filesystem, browser or direct upstream access.
+Run the reference agent from a clone of the [repository](https://github.com/satwiksps/harbor), which includes `examples/ask_gateway.py`, a standalone client using the official MCP and Google Gen AI SDKs. It discovers tools over HTTP without importing Harbor's backend. The model can use only those tools, with no shell, filesystem, browser or direct upstream access.
 
 Run `uv sync --frozen` first. Use the member's gateway key and your Gemini provider key. They serve different purposes: the gateway key identifies your Harbor account; the provider key authorizes the model request.
 
