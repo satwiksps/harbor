@@ -52,13 +52,111 @@ Three independent Python processes expose Streamable HTTP MCP: WooCommerce, stor
 
 The public ingress hosts are the dashboard and storefront. `/api` and `/mcp` on the console host route to FastAPI. Upstreams and databases have only ClusterIP services. Kubernetes NetworkPolicies and a separate gateway-to-upstream bearer credential prevent ordinary cluster workloads from using the MCP services.
 
+### Cluster topology
+
+Everything runs in the `harbor` namespace except the Traefik ingress controller. A default-deny NetworkPolicy blocks all pod traffic; each arrow below is an explicit allow rule. Pods without an arrow to them cannot be reached from anywhere.
+
+```mermaid
+flowchart LR
+    accTitle: Harbor cluster topology
+    accDescr: Traefik routes the console host to the dashboard and gateway and the store host to WordPress. Only the gateway reaches the three MCP upstreams and PostgreSQL. Only the WooCommerce upstream reaches WordPress, and only WordPress reaches MariaDB. The gateway may call the Kubernetes API and public HTTPS addresses.
+    NET((Internet)) -->|80, 443| T[Traefik<br>kube-system]
+    subgraph H[namespace harbor]
+        D[dashboard]
+        G[gateway]
+        WOO[woo-mcp]
+        POL[policies-mcp]
+        SHIP[shipping-mcp]
+        PG[(postgres)]
+        WP[wordpress]
+        DB[(mariadb)]
+    end
+    T -->|console host /| D
+    T -->|console host /api, /mcp| G
+    T -->|store host /| WP
+    G -->|8001, bearer| WOO
+    G -->|8001, bearer| POL
+    G -->|8001, bearer| SHIP
+    G -->|5432| PG
+    WOO -->|8080, signed REST| WP
+    WP -->|3306| DB
+    G -->|443| API[Kubernetes API]
+    G -->|443, public addresses only| EXT[Gemini and public MCP servers]
+```
+
+| Resource | Used by | Contents |
+| --- | --- | --- |
+| Secret `harbor-app-secrets` | Every workload except the dashboard, as environment variables | Database passwords, session secret, bootstrap administrator password, WooCommerce keys, bundled upstream tokens, Gemini key |
+| Secret `harbor-upstream-credentials` | Gateway, through the Kubernetes API (`get`, `patch` on this Secret only) | Credentials of registered upstreams |
+| Secret `harbor-ingress-tls` | Traefik (production only) | Certificate issued by cert-manager |
+| Volume `postgres-data` | PostgreSQL | Users, keys, sessions, registry, Activity |
+| Volume `mariadb-data` | MariaDB | WooCommerce products, orders and settings |
+| Volume `wordpress-data` | WordPress | Plugins, theme and uploads |
+
 ## One tool execution path
 
 An external client sends its personal API key to `/mcp`. Middleware authenticates every request against the database, including requests on an existing MCP transport. The handler resolves the public tool alias, checks the server is enabled, applies the user's role, validates the JSON arguments and calls the original tool through the official Python SDK.
 
+```mermaid
+sequenceDiagram
+    accTitle: One external tool call
+    accDescr: The gateway authenticates the key, resolves the alias, records a pending audit row, checks permissions, validates arguments, loads the upstream credential and calls the upstream. It validates the result, finishes the audit row and replies.
+    autonumber
+    participant C as MCP client
+    participant G as Gateway /mcp
+    participant P as PostgreSQL
+    participant S as Credential Secret
+    participant U as woo-mcp
+    participant W as WooCommerce
+    C->>G: tools/call with alias and arguments, Bearer user key
+    G->>P: Look up key hash, load user and role
+    G->>G: Resolve alias to server and original tool name
+    G->>P: Insert audit row as pending
+    G->>G: Check server enabled and role permits the tool
+    Note over G: Per-upstream slot and tool deadline start
+    G->>G: Validate arguments in the schema worker
+    G->>S: Read this upstream's credential
+    G->>U: tools/call with original name and server credential
+    U->>W: Signed REST request
+    W-->>U: JSON response
+    U-->>G: Tool result
+    G->>G: Validate result, redact credential
+    G->>P: Finish audit row with outcome and duration
+    G-->>C: Result, or a clear error
+```
+
+The user's key never leaves the gateway. Steps 6 to 12 run under the tool deadline, so a slow or dead upstream ends as a timeout for that call only. Policies and shipping follow the same path but answer from their own rules instead of calling WooCommerce.
+
 Dashboard chat uses a short-lived, signed delegation token bound to the verified dashboard session. The gateway checks that session and the user's current role for each delegated call. Browser-supplied user IDs never establish identity. The chat module uses an HTTP MCP client for execution, so the same gateway authorization and audit code applies. The LLM and browser never receive upstream credentials.
 
 The chat loop disables automatic SDK function execution. It presents permitted tools, receives function calls, executes read operations through MCP and supplies results back to the model. Mutations pause for a one-use confirmation bound to the user and session. Calls bind the intended tool to its upstream revision, destination, schema and permissions. The gateway checks that binding and current authority again after waiting for capacity and completing the upstream handshake. Automatic chat calls also require the tool to remain read-only. A changed connection or permission requires a fresh proposal. A bounded number of rounds, calls, output bytes and concurrent requests limits resource use.
+
+```mermaid
+sequenceDiagram
+    accTitle: Dashboard chat acting as the signed-in user
+    accDescr: The chat module lists tools permitted for the user, sends them to Gemini, and executes each function call through the gateway with a signed delegation token. Read tools run immediately; write tools wait for the user's approval.
+    participant B as Browser
+    participant A as Chat module
+    participant M as Gemini
+    participant G as Gateway /mcp
+    B->>A: POST /api/chat with session cookie and CSRF token
+    A->>A: List tools permitted for this user
+    A->>M: Conversation and permitted tool declarations
+    M-->>A: Function call
+    alt Read tool
+        A->>G: tools/call with a 5-minute delegation token for this session
+        G-->>A: Result, audited under the user
+        A->>M: Function result
+        M-->>A: Answer
+        A-->>B: Answer and the tool calls made
+    else Write tool
+        A-->>B: Confirmation card with the exact tool and arguments
+        B->>A: POST /api/chat/confirm
+        A->>G: tools/call bound to the reviewed target
+        G-->>A: Result, audited under the user
+        A-->>B: Result
+    end
+```
 
 The confirmation flow is part of dashboard chat. External administrator clients may invoke write tools directly. Member keys remain limited to tools the administrator has classified as read operations.
 
