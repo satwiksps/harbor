@@ -14,6 +14,11 @@
   A <a href="https://docs.harbor.satwiksps.site/#how-it-works">Model Context Protocol gateway</a> for WooCommerce with <a href="https://docs.harbor.satwiksps.site/user-guide/#roles-and-permissions">personal keys and role-based access</a>.
 </p>
 
+<p align="center">
+  <a href="https://github.com/satwiksps/harbor/actions/workflows/ci.yaml"><img src="https://github.com/satwiksps/harbor/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0"></a>
+</p>
+
 <table align="center" width="100%">
   <tr>
     <td align="center" valign="top" width="33%">
@@ -33,6 +38,8 @@
     </td>
   </tr>
 </table>
+
+<p align="center"><sub>Login details for the hosted console are available on request.</sub></p>
 
 ## Run locally
 
@@ -57,7 +64,33 @@ pwsh -File scripts/bootstrap.ps1
 - **[Use chat](https://docs.harbor.satwiksps.site/user-guide/#use-chat-and-review-writes):** sign in and ask `What orders came in today?`. Administrators review and approve proposed writes; members use permitted read tools.
 - **[Connect an external client](https://docs.harbor.satwiksps.site/external-clients/#connect-a-client):** create a [personal key](https://docs.harbor.satwiksps.site/user-guide/#create-an-api-key), select Streamable HTTP, and set `http://harbor.localhost:8080/mcp` with `Authorization: Bearer <KEY>`. Hosted endpoint: `https://harbor.satwiksps.site/mcp`. [MCP Inspector](https://docs.harbor.satwiksps.site/external-clients/#mcp-inspector) can list and call tools without Gemini.
 
+## Verify the main flows
+
+Use one administrator and one member account. The automated checks run against a deployed instance; see [checks against a running application](https://docs.harbor.satwiksps.site/development/#checks-against-a-running-application).
+
+| Flow | Check by hand | Automated check |
+| --- | --- | --- |
+| Storefront checkout | Add a product to the cart, check out with Cash on delivery, then find the order in WooCommerce admin | [`tests.browser_acceptance`](tests/browser_acceptance.py), [`tests.live_order_journey`](tests/live_order_journey.py) |
+| Chat creates a product | As an administrator, ask chat to create a product with a name and price, approve the card, then open the store | [`tests.browser_acceptance`](tests/browser_acceptance.py) |
+| Today's orders through chat | Place an order, then ask chat `What orders came in today?` | [`tests.browser_acceptance`](tests/browser_acceptance.py) |
+| External client discovery | Connect MCP Inspector to `/mcp` with the member's key and list tools from all enabled servers | [`tests.acceptance`](tests/acceptance.py), [`tests.external_agent`](tests/external_agent.py) |
+| One prompt, two upstreams | Ask for today's orders and the shipping policy in one prompt | [`tests.acceptance --chat`](tests/acceptance.py), [`tests.external_agent`](tests/external_agent.py) |
+| Key revocation | Revoke the member's key; their next call is rejected, even on an open connection | [`tests.acceptance`](tests/acceptance.py) |
+| Disabled upstream | Disable a connection; its tools disappear from chat and the external client, and stale calls fail | [`tests.acceptance`](tests/acceptance.py) |
+| Upstream failure | Run `kubectl -n harbor scale deployment/shipping-mcp --replicas=0`; the other servers keep working and Connections shows shipping as Unreachable. Scale it back to `1` afterwards | [`scripts/verify_failure.py`](scripts/verify_failure.py) |
+| Activity attribution | Open Activity; each call shows the user, server, tool, time, duration and outcome | [`tests.acceptance`](tests/acceptance.py) |
+
 ## Source and design
+
+```mermaid
+flowchart TB
+    UI[React console] -->|Session cookie| API[FastAPI and MCP gateway]
+    CLI[External MCP client] -->|Bearer key| API
+    API --> PG[(PostgreSQL)]
+    API -->|Service credentials| MCP[Commerce, policies and shipping MCP]
+    MCP -->|Commerce REST calls| WP[WordPress + WooCommerce]
+    WP --> DATA[(MariaDB and WordPress files)]
+```
 
 | Component | Source |
 | --- | --- |
