@@ -95,7 +95,7 @@ The commands below use Ubuntu, x86-64, K3s `v1.35.5+k3s1`, Helm `4.3.1` and cert
 
 The [public console](https://harbor.satwiksps.site/) and [store](https://store.harbor.satwiksps.site/) run on one AWS EC2 instance in `ap-south-1`, set up with the procedure below: `t3a.medium` (2 vCPU, 4 GiB, x86-64), Ubuntu 24.04, a 30 GiB gp3 root volume and a 2 GiB swap file for image builds. The instance uses the Standard CPU credit mode, so sustained load is throttled instead of billed as surplus credits. An Elastic IP keeps the address fixed across stop and start. The security group allows TCP 80/443 from the internet and TCP 22 from the operator's address only.
 
-The host is funded by promotional credits. An AWS Budgets action stops the instance if charges appear beyond them; that takes the demo offline, and the volume and Elastic IP keep accruing charges until they are deleted.
+The host is funded by promotional credits. An AWS Budgets action stops the instance if charges appear beyond them; that takes the demo offline, and the volume and Elastic IP keep accruing charges until they are deleted. Application data is copied nightly to a private S3 bucket in the same region, as described in [Schedule off-node backups](#schedule-off-node-backups).
 
 ### Prepare the public host
 
@@ -286,6 +286,35 @@ sudo bash scripts/backup-vps.sh
 ```
 
 This creates a new mode-700 directory under `.secrets/backups`, keeps failed outputs marked `.partial`, removes server-generated Secret metadata for recovery, and records Helm values and checksums alongside the database/content backups. Copy the completed directory off the VM. This is an application backup, not a snapshot of the k3s control plane. A replacement node runs a new cluster and receives the restored application data before DNS moves to it; see [Move to a new host](#move-to-a-new-host).
+
+### Schedule off-node backups
+
+On the VPS, a systemd timer runs `backup-vps.sh` every night and uploads the result to Amazon S3, so the latest application data survives the loss of the instance. Scheduled runs do not pause writes, so each archive has the independent-snapshot limitation described above.
+
+Prepare AWS once:
+
+1. Create a private S3 bucket in the instance's region with Block Public Access and default encryption. Add a lifecycle rule that expires objects under `nightly/` after 30 days.
+2. Create an IAM policy that allows only `s3:PutObject` on `arn:aws:s3:::BUCKET/nightly/*`. Attach it to a role that EC2 can assume, then attach the role to the instance. No access keys are stored on the host.
+3. Install the AWS CLI on the host with `sudo snap install aws-cli --classic`.
+
+The role cannot list, read or delete backups, so a compromised node cannot erase earlier copies. It can still overwrite an object whose name it guesses; enable bucket versioning if that matters for your environment.
+
+Install the job from the repository checkout, replacing `BUCKET` and `REGION`:
+
+```sh
+sudo install -m 0750 scripts/backup-offsite.sh /usr/local/sbin/harbor-offsite-backup
+sudo install -m 0644 deploy/vps/harbor-backup.service deploy/vps/harbor-backup.timer /etc/systemd/system/
+sudo install -d -m 0700 /etc/harbor
+printf 'HARBOR_REPO=%s\nHARBOR_BACKUP_BUCKET=%s\nHARBOR_BACKUP_REGION=%s\n' "$PWD" BUCKET REGION |
+  sudo tee /etc/harbor/backup.env > /dev/null
+sudo systemctl daemon-reload
+sudo systemctl start harbor-backup.service
+sudo systemctl enable --now harbor-backup.timer
+```
+
+The `start` command takes a backup immediately. Check `journalctl -u harbor-backup` for the `Uploaded` line and confirm the object in the bucket. The timer then runs at 21:30 UTC (03:00 IST) with up to 10 minutes of random delay, at idle I/O priority, and runs a missed backup after the host comes back. The newest seven scheduled copies stay under `.secrets/backups/nightly`; set `HARBOR_BACKUP_KEEP_LOCAL` in `backup.env` to change that. Manual backups are not pruned.
+
+Archives contain the application Secrets and credential files. Treat the bucket as secret storage: default encryption protects objects at rest, not from an account that can read them. To restore, download an archive with an operator account, extract it, run `sha256sum -c SHA256SUMS` in the backup directory and follow [Restore data](#restore-data).
 
 ### Upgrade or roll back application configuration
 

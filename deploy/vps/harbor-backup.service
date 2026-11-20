@@ -1,0 +1,13 @@
+[Unit]
+Description=Harbor application backup to S3
+Wants=network-online.target
+After=network-online.target k3s.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/harbor/backup.env
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+ExecStart=/usr/local/sbin/harbor-offsite-backup
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min
