@@ -56,7 +56,7 @@ pwsh -File scripts/bootstrap.ps1
 
 1. [Prepare a dedicated Linux host](https://docs.harbor.satwiksps.site/operations/#prepare-the-public-host): install k3s with Secret encryption, Helm and cert-manager; configure console/store DNS and firewall rules.
 2. [Build and import a release](https://docs.harbor.satwiksps.site/operations/#deploy-a-reviewed-release), then run `sudo bash scripts/deploy-vps.sh CONSOLE_HOST STORE_HOST ADMIN_EMAIL TAG`. The helper generates fresh production credentials on first installation.
-3. Review [production values](https://docs.harbor.satwiksps.site/operations/#manual-deployment-configuration): DNS, TLS ingress, storage class/sizes and existing Secrets. [Verify the deployment](https://docs.harbor.satwiksps.site/development/#testing-a-public-deployment) and configure [backups](https://docs.harbor.satwiksps.site/operations/#create-a-backup).
+3. Review [production values](https://docs.harbor.satwiksps.site/operations/#manual-deployment-configuration): DNS, TLS ingress, storage class/sizes and existing Secrets. [Verify the deployment](https://docs.harbor.satwiksps.site/development/#testing-a-public-deployment) and schedule [off-node backups](https://docs.harbor.satwiksps.site/operations/#schedule-off-node-backups).
 
 To replace the VM without downtime, deploy and test the new host before changing DNS; see [Move to a new host](https://docs.harbor.satwiksps.site/operations/#move-to-a-new-host).
 
